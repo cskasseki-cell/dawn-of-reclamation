@@ -677,7 +677,8 @@ function newGame(){
     ufos:[],midPend:0,midSpawned:false,fires:[],banner:null,bannerT:0,
     boss:null,warnT:0,escorts:[],radio:null,briefT:0,shield:3,stars:[],opT:0,city:null,cityStage:0,
     deadT:0,victoryT:0,clearT:0,contT:0,credits:3,entering:0,toast:null,toastT:0,
-    exiting:0,exitY:0,exitV:0,frozen:false,boost:0,rankIn:false,entered:false,rank:1};
+    exiting:0,exitY:0,exitV:0,frozen:false,boost:0,rankIn:false,entered:false,rank:1,
+    sp:[2,2,2],spCast:null,ems:0,miss:[],drones:[]};
   buildWave();
 }
 function isBossWave(w){return WCUM.indexOf(w)>=0;}
@@ -685,7 +686,7 @@ function stageOf(w){for(let i=0;i<WCUM.length;i++)if(w<=WCUM[i])return i+1;retur
 function stageStart(sg){return sg>1?WCUM[sg-2]+1:1;}
 function subWave(w){return w-stageStart(stageOf(w))+1;}
 function buildWave(){
-  st.enemies=[];st.escorts=[];st.boss=null;st.beams=[];st.ufos=[];st.warnT=0;st.fires=[];
+  st.enemies=[];st.escorts=[];st.boss=null;st.beams=[];st.ufos=[];st.warnT=0;st.fires=[];st.miss=[];
   st.frozen=false;
   if(st.exiting){st.exiting=0;st.exitY=0;st.exitV=0;st.entering=110;st.px=W/2;st.inv=150;}
   st.stage=stageOf(st.wave);
@@ -783,7 +784,7 @@ function spawnBoss(){
     const msh=22+lvl*7, mhp=14+lvl*5;
     const U={x:(u+1)*(W/(nu+1))-8,y:28+(u%2)*14,ph:rnd(0,6.283),
       vx:(u%2?-1:1)*rnd(.4,.75),sh:msh,shMax:msh,shFlash:0,
-      hp:mhp,hpMax:mhp,flash:0,fire:rint(220,360),laser:0,esc:rint(120,220),dead:0,fv:0};
+      hp:mhp,hpMax:mhp,flash:0,fire:rint(220,360),laser:0,esc:rint(120,220),dead:0,fv:0,armT:120};
     st.ufos.push(U);
     for(let k=0;k<2;k++)addMidEscort(U,k,2);
   }
@@ -1218,10 +1219,34 @@ function doContinue(){
   st.bullets=[];st.ebul=[];st.escorts=[];st.beams=[];st.boss=null;
   st.banner=null;st.bannerT=0;st.radio=null;st.warnT=0;st.victoryT=0;
   st.deadT=0;st.contT=0;st.parts=[];st.sparks=[];
+  st.sp=[2,2,2];st.spCast=null;st.ems=0;st.miss=[];st.drones=[];
   buildWave();
   scene='play';
   snd(330,880,.4,'square',.07);
   toast('CONTINUE','SCORE -90%','#ff5b6e');
+}
+/* ================= 必殺技 ================= */
+const SPECIAL=[
+ {name:'ライジングサン',   sub:'RISING SUN', col:'#ff3b30', sc:4},
+ {name:'ドナルド・トランプ',sub:'E.M.S.',     col:'#ffd93d', sc:3},
+ {name:'五星紅旗',         sub:'WINGMEN',    col:'#ff8a3d', sc:4},
+];
+const SPB={x:W-42,y:H-66,w:36,h:28};
+function inSPB(x,y){return x>=SPB.x-5&&x<=SPB.x+SPB.w+5&&y>=SPB.y-5&&y<=SPB.y+SPB.h+5;}
+function pilotIdx(){return Math.min(2,Math.max(0,3-st.lives));}
+function canSpecial(){
+  return scene==='play'&&st&&!st.spCast&&st.entering<=0&&st.briefT<=0&&
+         st.sp&&st.sp[pilotIdx()]>0;
+}
+function trySpecial(){
+  if(!canSpecial()){ if(scene==='play')snd(140,70,.2,'square',.04); return false; }
+  const k=pilotIdx(), S=SPECIAL[k];
+  st.sp[k]--;
+  st.spCast={kind:k,name:S.name,sub:S.sub,col:S.col,sc:S.sc,t:0,dur:120};
+  flash=Math.max(flash,.6); shake=Math.max(shake,6); chroma=3;
+  snd(180,1400,.7,'sawtooth',.07);
+  setTimeout(()=>snd(300,1900,.5,'square',.05),130);
+  return true;
 }
 function press(fromKey){
   ensureAudio();
@@ -1238,14 +1263,18 @@ function press(fromKey){
   }
   else if(scene==='clear'&&st.clearT>150){scene='title';snd(300,600,.3,'square',.06);}
 }
-cv.addEventListener('touchstart',e=>{e.preventDefault();touching=true;
-  const q=toLocal(e.touches[0].clientX,e.touches[0].clientY);tx=q.x;ty=q.y;
-  ensureAudio();press();},{passive:false});
+cv.addEventListener('touchstart',e=>{e.preventDefault();
+  const q=toLocal(e.touches[0].clientX,e.touches[0].clientY);
+  ensureAudio();
+  if(scene==='play'&&inSPB(q.x,q.y)){trySpecial();return;}   // 必殺技ボタンでは移動しない
+  touching=true;tx=q.x;ty=q.y;press();},{passive:false});
 cv.addEventListener('touchmove',e=>{e.preventDefault();
   tx=toLocal(e.touches[0].clientX,e.touches[0].clientY).x;},{passive:false});
 cv.addEventListener('touchend',e=>{e.preventDefault();touching=false;},{passive:false});
-cv.addEventListener('mousedown',e=>{touching=true;
-  const q=toLocal(e.clientX,e.clientY);tx=q.x;ty=q.y;press();});
+cv.addEventListener('mousedown',e=>{
+  const q=toLocal(e.clientX,e.clientY);
+  if(scene==='play'&&inSPB(q.x,q.y)){trySpecial();return;}
+  touching=true;tx=q.x;ty=q.y;press();});
 cv.addEventListener('mousemove',e=>{if(touching)tx=toLocal(e.clientX,e.clientY).x;});
 window.addEventListener('mouseup',()=>touching=false);
 ['touchend','pointerdown','keydown'].forEach(ev=>
@@ -1258,7 +1287,8 @@ muteUI();
    mb.addEventListener('touchstart',h,{passive:false});mb.addEventListener('mousedown',h);}}
 window.addEventListener('keydown',e=>{keys[e.key]=true;
   if(e.key===' '||e.key==='Enter'){e.preventDefault();press(true);}
-  if(e.key==='m'||e.key==='M')toggleMute();});
+  if(e.key==='m'||e.key==='M')toggleMute();
+  if(e.key==='z'||e.key==='Z'){e.preventDefault();trySpecial();}});
 window.addEventListener('keyup',e=>{keys[e.key]=false;});
 
 /* ================= スコア係数（ステージ / 武器 / 位置） ================= */
@@ -1428,7 +1458,7 @@ function spawnMid(i,n){
   const lv=st.stage-1, msh=22+lv*7, mhp=14+lv*5;   // 砲塔と同じ二層構造
   const U={x:n===1?W/2-8:(i===0?W*.26:W*.74-16),y:36+i*15,ph:rnd(0,6.283),
     vx:(i%2?-1:1)*rnd(.45,.8),sh:msh,shMax:msh,shFlash:0,
-    hp:mhp,hpMax:mhp,flash:0,fire:rint(170,280),laser:0,esc:0,dead:0,fv:0};
+    hp:mhp,hpMax:mhp,flash:0,fire:rint(170,280),laser:0,esc:0,dead:0,fv:0,armT:150};
   st.ufos.push(U);
   const ne=Math.min(6,4+Math.floor((st.stage-1)/2));   // 護衛機を増数
   for(let k=0;k<ne;k++)addMidEscort(U,k,ne);
@@ -1467,12 +1497,13 @@ function updateMids(){
     if(U.x>W-22){U.x=W-22;U.vx=-Math.abs(U.vx);}
     U.y=36+Math.sin(tick*.013+U.ph)*7;
     if(U.shFlash>0)U.shFlash--;
+    if(U.armT>0)U.armT--;                            // 出現字幕が消えるまでは交戦しない
     if(U.laser>0){
       U.laser--;
       if(U.laser<54&&st.inv<=0&&st.entering<=0&&
          (Math.abs(st.px-(U.x+3))<6||Math.abs(st.px-(U.x+13))<6))damage('mid');
       if(U.laser===54){snd(180,90,.5,'sawtooth',.05);shake=Math.max(shake,4);}
-    }else if(--U.fire<=0){
+    }else if(midArmed(U)&&--U.fire<=0){              // 字幕・警報中は攻撃を始めない
       U.fire=rint(240,420); U.laser=76; snd(900,1500,.4,'sine',.035);
     }
     const n=st.escorts.filter(e=>e.alive&&e.mode==='m'&&e.host===U).length;
@@ -1585,8 +1616,139 @@ function startSink(){
   slowMo=120;flash=1;shake=12;chroma=3;
   st.banner=null;st.bullets.length=0;st.beams.length=0;
   scatterEscorts(null);                         // 母艦を失った護衛は散る
-  st.exiting=1;st.exitY=0;st.exitV=0;st.inv=Math.max(st.inv,900);
+  st.exiting=1;st.exitY=0;st.exitV=0;st.inv=Math.max(st.inv,900);st.miss.length=0;
   snd(90,30,1.8,'sawtooth',.09);
+}
+
+/* --- 交戦可否（字幕・警報・EMS中は敵も撃たない） --- */
+function bossHold(){ return !!(st.boss && (st.boss.phase!=='fight' || st.boss.armT>0)); }
+function foeArmed(){ return st.ems<=0 && st.warnT<=0 && st.entering<=0 && st.briefT<=0; }
+function midArmed(U){
+  if(!foeArmed()||bossHold())return false;
+  return !U || (!U.dead && (U.armT||0)<=0);
+}
+
+/* --- 任意座標への着弾処理（誘導弾・僚機で共用） --- */
+function damageAt(x,y,dmg){
+  for(const U of st.ufos){
+    if(U.dead)continue;
+    if(x>U.x-2&&x<U.x+18&&y>U.y-2&&y<U.y+9){midHit(U,dmg,x,y);return true;}
+  }
+  for(const e of st.escorts){
+    if(!e.alive)continue;
+    if(x>=e.x-1&&x<=e.x+6&&y>=e.y-1&&y<=e.y+6){ if(escortHit(e,dmg,x,y))return true; }
+  }
+  for(const e of st.enemies){
+    if(!e.alive)continue;
+    if(x>=e.x-1&&x<=e.x+e.w+1&&y>=e.y&&y<=e.y+e.h){hurtEnemy(e,dmg);return true;}
+  }
+  if(st.boss&&st.boss.phase!=='dying'){ if(bossHit(x,y,dmg)===1)return true; }
+  return false;
+}
+
+/* --- 必殺技① ライジングサン：高得点の敵を優先する誘導弾 --- */
+function missileTargets(){
+  const L=[];
+  for(const U of st.ufos)if(!U.dead)L.push({k:'u',o:U,v:900});
+  if(st.boss&&st.boss.phase==='fight')
+    for(const t of st.boss.turrets)if(t.alive)L.push({k:'t',o:t,v:400});
+  for(const e of st.enemies)if(e.alive)L.push({k:'e',o:e,v:KIND[e.k].pts});
+  for(const e of st.escorts)if(e.alive)L.push({k:'s',o:e,v:e.mode==='p'?40:25});
+  L.sort((a,b)=>b.v-a.v);                      // 単価の高い敵から順に狙う
+  return L;
+}
+function targetPos(t){
+  if(!t)return null;
+  if(t.k==='u')return t.o.dead?null:[t.o.x+8,t.o.y+3];
+  if(t.k==='t'){const B=st.boss;return (B&&B.phase!=='dying'&&t.o.alive)?[B.x+t.o.ox,B.y+t.o.oy]:null;}
+  if(t.k==='e')return t.o.alive?[t.o.x+t.o.w/2,t.o.y+t.o.h/2]:null;
+  return t.o.alive?[t.o.x+2,t.o.y+2]:null;
+}
+function castRisingSun(){
+  const L=missileTargets();
+  for(let i=0;i<5;i++){
+    const a=-1.5708+(i-2)*.40;
+    st.miss.push({x:st.px+(i-2)*4,y:st.py-6,vx:Math.cos(a)*2.4,vy:Math.sin(a)*2.4,
+      tg:L.length?L[i%L.length]:null,life:320,dmg:3});
+  }
+  shake=Math.max(shake,6); flash=Math.max(flash,.5);
+  snd(300,900,.5,'sawtooth',.06);
+  toast('RISING SUN','誘導弾 5発','#ff3b30');
+}
+function updateMissiles(){
+  if(!st.miss||!st.miss.length)return;
+  const SPD=3.4;
+  for(let i=st.miss.length-1;i>=0;i--){
+    const m=st.miss[i]; m.life--;
+    let p=targetPos(m.tg);
+    if(!p){ const L=missileTargets(); m.tg=L.length?L[0]:null; p=targetPos(m.tg); }
+    if(p){
+      const dx=p[0]-m.x, dy=p[1]-m.y, d=Math.hypot(dx,dy)||1;
+      m.vx+=(dx/d*SPD-m.vx)*.16; m.vy+=(dy/d*SPD-m.vy)*.16;
+      const s=Math.hypot(m.vx,m.vy)||1;
+      m.vx=m.vx/s*SPD; m.vy=m.vy/s*SPD;
+    }else{ m.vy=Math.max(-SPD,m.vy-.25); }
+    m.x+=m.vx; m.y+=m.vy;
+    if(tick%2===0)addPart({x:m.x,y:m.y,vx:rnd(-.25,.25),vy:rnd(.1,.6),
+      life:rnd(12,26),max:26,col:Math.random()<.4?'#ffd8a0':'#ff8a5c'});
+    const hit=damageAt(m.x,m.y,m.dmg);
+    if(hit||m.life<=0||m.y<-14||m.x<-14||m.x>W+14){
+      if(hit){blast(m.x,m.y,18,'#ff6b3d',14);snd(220,90,.25,'sawtooth',.05);}
+      st.miss.splice(i,1);
+    }
+  }
+}
+
+/* --- 必殺技② ドナルド・トランプ：EMS で敵を5秒無力化 --- */
+function emsStrip(){
+  for(const U of st.ufos){if(U._sh===undefined)U._sh=U.sh;U.sh=0;U.laser=0;}
+  for(const e of st.escorts){if(e._sh===undefined)e._sh=e.sh;e.sh=0;}
+  if(st.boss)for(const t of st.boss.turrets){if(t._sh===undefined)t._sh=t.sh;t.sh=0;}
+}
+function emsRestore(){
+  for(const U of st.ufos)if(U._sh!==undefined){U.sh=U._sh;U._sh=undefined;}
+  for(const e of st.escorts)if(e._sh!==undefined){e.sh=e._sh;e._sh=undefined;}
+  if(st.boss)for(const t of st.boss.turrets)if(t._sh!==undefined){t.sh=t._sh;t._sh=undefined;}
+  toast('E.M.S. END','敵 機能回復','#8fa0b3');
+  snd(300,140,.4,'sawtooth',.05);
+}
+function castEMS(){
+  st.ems=300;                                        // 5秒
+  for(const b of st.ebul)                            // 敵弾は力を失い落ちて消える
+    addPart({x:b.x,y:b.y,vx:rnd(-.4,.4),vy:rnd(.6,1.8),life:rnd(50,95),max:95,col:'#ff6b8a'});
+  st.ebul.length=0;
+  if(st.boss)st.boss.sweep=null;
+  emsStrip();
+  flash=Math.max(flash,.9); shake=Math.max(shake,9); chroma=3;
+  for(let k=0;k<4;k++)st.rings.push({x:W/2,y:H/2-20,r:1+k*12,max:320,
+    col:k%2?'#ffffff':'#ffd93d',lw:1});
+  noise(.6,.07); snd(120,2400,.9,'sawtooth',.07);
+  toast('E.M.S.','敵 5秒 無防備','#ffd93d');
+}
+
+/* --- 必殺技③ 五星紅旗：自機と連動する僚機ドローン2機 --- */
+function castWingmen(){
+  st.drones=[];
+  for(const s of [-1,1])
+    st.drones.push({side:s,x:st.px+s*18,y:st.py+3,sh:3,shFlash:0,ph:rnd(0,6.283)});
+  for(const d of st.drones)st.rings.push({x:d.x,y:d.y,r:1,max:40,col:'#ff8a3d',lw:1});
+  flash=Math.max(flash,.5);
+  snd(520,1200,.4,'square',.05);
+  toast('WINGMEN','僚機 2機 展開','#ff8a3d');
+}
+function updateDrones(){
+  if(!st.drones||!st.drones.length)return;
+  for(const d of st.drones){
+    d.ph+=.06;
+    d.x+=(clamp(st.px+d.side*18,6,W-6)-d.x)*.22;
+    d.y+=((st.py+3+Math.sin(d.ph)*2)-d.y)*.22;
+    if(d.shFlash>0)d.shFlash--;
+  }
+}
+function applySpecial(k){
+  if(k===0)castRisingSun();
+  else if(k===1)castEMS();
+  else castWingmen();
 }
 
 /* ================= 更新 ================= */
@@ -1627,6 +1789,12 @@ function update(){
     if(st.briefT===0)snd(660,990,.22,'square',.05);
     return;
   }
+  if(st.spCast){                                    // 必殺技の字幕中は敵味方とも完全停止
+    const C=st.spCast; C.t++;
+    if(C.t>=C.dur){ st.spCast=null; applySpecial(C.kind); }
+    return;
+  }
+  if(st.ems>0){ st.ems--; if(st.ems===0)emsRestore(); }
   if(st.victoryT>0){st.victoryT--;if(st.victoryT===0){st.wave++;buildWave();}}
 
   const T=TIER[st.tier];
@@ -1638,6 +1806,7 @@ function update(){
   if(keys.ArrowRight||keys.d)target=st.px+4;
   st.px+=(target-st.px)*.35;
   st.px=clamp(st.px,8,W-8);
+  updateDrones();
   if(st.inv>0)st.inv--;
   if(st.entering>0)st.entering--;                    // 増援が上がってくる間
   if(st.exiting){st.exitV+=.085;st.exitY+=st.exitV;}  // 撃沈を見届けて離脱
@@ -1663,10 +1832,13 @@ function update(){
         const off=T.shots===1?0:(i-(T.shots-1)/2);
         st.bullets.push({x:st.px+off*3,y:st.py-6,vx:off*.55,vy:-T.spd,dmg:T.dmg,col:T.col});
       }
+      for(const d of st.drones)                      // 僚機も同じ兵装で連動射撃
+        st.bullets.push({x:d.x,y:d.y-5,vx:0,vy:-T.spd,dmg:T.dmg,col:T.col});
       snd(880+st.tier*160,520,.05,'square',.028);
     }
   }else{
     fireLaser(T);
+    for(const d of st.drones)fireLaserFrom(T,d.x,d.y-3,true);
   }
 
   if(st.boost>0){                                    // 出力を維持できる時間
@@ -1715,6 +1887,7 @@ function update(){
   updateEscorts();
 
   updateMids();
+  updateMissiles();
 
   // 自弾の当たり判定
   for(let i=st.bullets.length-1;i>=0;i--){
@@ -1742,18 +1915,32 @@ function update(){
   // 敵弾
   for(let i=st.ebul.length-1;i>=0;i--){
     const b=st.ebul[i]; if(!b)continue;
-    if(st.inv<=0&&Math.abs(b.x-st.px)<7&&b.y>st.py+1&&b.y<st.py+12){st.ebul.splice(i,1);damage(b.src);}
+    if(st.inv<=0&&Math.abs(b.x-st.px)<7&&b.y>st.py+1&&b.y<st.py+12){st.ebul.splice(i,1);damage(b.src);continue;}
+    for(const d of st.drones){                        // 僚機が身代わりになる
+      if(Math.abs(b.x-d.x)<5&&Math.abs(b.y-d.y)<6){
+        d.sh--; d.shFlash=6;
+        st.rings.push({x:d.x,y:d.y,r:1,max:18,col:'#ffd08a',lw:1});
+        snd(700,300,.12,'square',.04);
+        st.ebul.splice(i,1);
+        break;
+      }
+    }
   }
+  if(st.drones.length)st.drones=st.drones.filter(d=>{
+    if(d.sh>0)return true;
+    blast(d.x,d.y,26,'#ff8a3d',18); snd(200,80,.35,'sawtooth',.05);
+    return false;
+  });
   stepFX();
 }
 
 /* --- レーザー --- */
-function fireLaser(T){
+function fireLaser(T){ fireLaserFrom(T,st.px,st.py-4,false); }
+function fireLaserFrom(T,ox,oy,quiet){
   {
-    const dx=0,dy=-1;
-    let ex=st.px,ey=st.py-4,hitPt=null,dmgDone=0;
+    let ex=ox,ey=oy,hitPt=null,dmgDone=0;
     for(let d=0;d<420;d+=2){
-      const x=st.px+dx*d,y=st.py-4+dy*d;
+      const x=ox,y=oy-d;
       if(x<0||x>W||y<0){ex=x;ey=y;break;}
       let blocked=false;
       // 敵
@@ -1786,11 +1973,11 @@ function fireLaser(T){
       if(blocked){ex=x;ey=y;hitPt=[x,y];break;}
       ex=x;ey=y;
     }
-    st.beams.push({x1:st.px,y1:st.py-4,x2:ex,y2:ey,hit:hitPt,col:T.col,w:T.wide});
+    st.beams.push({x1:ox,y1:oy,x2:ex,y2:ey,hit:hitPt,col:T.col,w:T.wide});
     if(hitPt&&tick%2===0)for(let k=0;k<T.wide;k++)
       st.sparks.push({x:hitPt[0],y:hitPt[1],vx:rnd(-1.8,1.8),vy:rnd(-1.8,.5),life:12,col:'#ffffff'});
   }
-  if(tick%6===0)snd(1500+(T.wide>1?600:0),1100,.06,'sawtooth',T.wide>1?.03:.018);
+  if(!quiet&&tick%6===0)snd(1500+(T.wide>1?600:0),1100,.06,'sawtooth',T.wide>1?.03:.018);
 }
 
 /* --- 通常編隊 --- */
@@ -1841,7 +2028,7 @@ function updateSwarm(){
     if(e.dive){                                    // 降下しながら撃ち、抜けたら離脱
       e.dive.t++;
       e.bx+=e.dive.vx; e.y+=e.dive.vy; e.x=e.bx;
-      if(e.dive.t%46===0)st.ebul.push({x:e.x+e.w/2,y:e.y+e.h,vy:2.3,src:'zako'});
+      if(e.dive.t%46===0&&foeArmed())st.ebul.push({x:e.x+e.w/2,y:e.y+e.h,vy:2.3,src:'zako'});
       if(st.inv<=0&&Math.abs(e.x+e.w/2-st.px)<9&&Math.abs(e.y+4-(st.py+6))<10){
         e.alive=false; damage('zako');
       }
@@ -1864,7 +2051,7 @@ function updateSwarm(){
     e.ox=clamp(e.ox,-15,15);
     e.x=e.bx+e.ox;
   }
-  if(Math.random()<.012+st.stage*.004){
+  if(foeArmed()&&Math.random()<.012+st.stage*.004){
     const cols={};
     for(const e of form){const k=Math.round(e.bx/21);if(!cols[k]||e.y>cols[k].y)cols[k]=e;}
     const arr=Object.values(cols);
@@ -1899,7 +2086,7 @@ function updateEscorts(){
         e.ang+=e.spd;
         e.x=e.host.x+8+Math.cos(e.ang)*e.rad-2;
         e.y=e.host.y+3+Math.sin(e.ang)*e.rad*e.ry;
-        if(--e.fire<=0){e.fire=rint(90,170);
+        if(midArmed(e.host)&&--e.fire<=0){e.fire=rint(90,170);
           const dx=st.px-(e.x+2),dy=st.py-(e.y+5),d=Math.hypot(dx,dy)||1,sp=2.2;
           st.ebul.push({x:e.x+2,y:e.y+5,vx:dx/d*sp,vy:Math.max(.8,dy/d*sp),src:'mid'});}
         if(st.inv<=0&&st.entering<=0&&Math.abs(e.x+2-st.px)<8&&Math.abs(e.y+2-st.py)<7){
@@ -1913,7 +2100,7 @@ function updateEscorts(){
         e.ang+=e.spd;
         e.x=B.x+B.D.w/2+Math.cos(e.ang)*e.rad-2;
         e.y=B.y+B.D.h*.74+Math.sin(e.ang)*e.rad*e.ry+4;
-        if(--e.fire<=0&&B.phase==='fight'){
+        if(--e.fire<=0&&B.phase==='fight'&&B.armT<=0&&foeArmed()){
           e.fire=rint(150,300);
           st.ebul.push({x:e.x+2,y:e.y+5,vy:1.8,src:'escort'});
         }
@@ -1921,7 +2108,7 @@ function updateEscorts(){
     }else{                                          // 射出されて突っ込んでくる機体
       e.x+=Math.sin(e.t*.05)*1.1;e.y+=e.vy;
       if(e.y>H+6)e.alive=false;
-      if(e.t%90===0)st.ebul.push({x:e.x+2,y:e.y+5,vy:1.9,src:'escort'});
+      if(e.t%90===0&&foeArmed())st.ebul.push({x:e.x+2,y:e.y+5,vy:1.9,src:'escort'});
     }
     if(st.inv<=0&&Math.abs(e.x+2-st.px)<8&&Math.abs(e.y+2-st.py)<7){e.alive=false;damage('escort');}
   }
@@ -1960,7 +2147,7 @@ function updateBoss(){
     const cx=B.x+t.ox,cy=B.y+t.oy;
     t.ang=Math.atan2(st.py-cy,st.px-cx);
     t.cd--;
-    if(t.cd<=0&&B.armT<=0){
+    if(t.cd<=0&&B.armT<=0&&st.ems<=0){
       t.cd=Math.max(50,Math.round((rint(100,200)-B.lvl*4)*(B.turrets.length/4)));
       const sp=1.7+B.lvl*.2;
       st.ebul.push({x:cx,y:cy+4,vx:Math.cos(t.ang)*sp*.5,vy:Math.max(.8,Math.sin(t.ang)*sp),src:'boss'});
@@ -1972,7 +2159,7 @@ function updateBoss(){
   if(B.resp===undefined)B.resp=0;
   const pn=st.escorts.filter(e=>e.alive&&e.mode==='p').length;
   if(pn<B.np){
-    if(B.armT<=0&&--B.resp<=0){
+    if(B.armT<=0&&st.ems<=0&&--B.resp<=0){
       B.resp=rint(150,260);
       const esh=5+B.lvl*2;
       st.escorts.push({mode:'p',ang:rnd(0,6.283),rad:rnd(32,66),ry:rnd(.32,.58),
@@ -1983,7 +2170,7 @@ function updateBoss(){
   }else B.resp=rint(150,260);
   // 護衛機の射出
   B.escortT--;
-  if(B.armT<=0&&B.escortT<=0){
+  if(B.armT<=0&&st.ems<=0&&B.escortT<=0){
     B.escortT=rint(240,420);
     for(let i=0;i<2+B.lvl;i++)
       st.escorts.push({mode:'d',x:B.x+rnd(20,D.w-20),y:B.y+D.h*.6,vy:rnd(.7,1.3),
@@ -1992,7 +2179,7 @@ function updateBoss(){
   }
   // 掃射レーザー
   B.sweepT--;
-  if(B.armT<=0&&(!B.sweep||!B.sweep.length)&&B.sweepT<=0){
+  if(B.armT<=0&&st.ems<=0&&(!B.sweep||!B.sweep.length)&&B.sweepT<=0){
     const av=B.turrets.filter(q=>q.alive);
     if(av.length){
       const nb=Math.min(av.length,1+(B.lvl>=2?1:0)+(B.lvl>=5?1:0)+(B.lvl>=8?1:0)); // 2門〜段階的に増加
@@ -2116,6 +2303,7 @@ function damage(src){
   }
   const P=plane();
   st.lives--;st.inv=150;flash=.95;shake=12;chroma=3;hitStop=8;
+  st.drones.length=0;st.miss.length=0;              // 僚機は機体と運命を共にする
   burst(st.px-6,st.py,P.sp,P.col,3,true);
   blast(st.px,st.py+5,52,P.col,40);
   st.shield=3;
@@ -2156,7 +2344,7 @@ function firework(){
 function startEnding(){
   scene='clear';st.clearT=0;flash=1;shake=6;
   st.banner=null;st.bannerT=0;
-  st.beams.length=0;st.ebul.length=0;st.escorts.length=0;st.ufos.length=0;
+  st.beams.length=0;st.ebul.length=0;st.escorts.length=0;st.ufos.length=0;st.miss.length=0;
   noteHi();
   radio('管制室より通信',[
     '帝都奪還 完了！',
@@ -2333,6 +2521,24 @@ function draw(){
   }
   g.globalAlpha=1;g.globalCompositeOperation='source-over';
 
+  for(const m of st.miss){                            // 誘導ミサイル
+    const mx=Math.round(m.x),my=Math.round(m.y);
+    g.globalCompositeOperation='lighter';
+    g.globalAlpha=.55;g.fillStyle='#ff8a5c';g.fillRect(mx-2,my-2,5,5);
+    g.globalAlpha=1;g.globalCompositeOperation='source-over';
+    g.fillStyle='#ffffff';g.fillRect(mx-1,my-2,2,3);
+    g.fillStyle='#ff3b30';g.fillRect(mx-1,my+1,2,2);
+  }
+  for(const d of st.drones){                          // 僚機ドローン
+    const dx=Math.round(d.x)-2,dy=Math.round(d.y)-2;
+    spriteO(ESCORT,dx,dy,d.shFlash>0?'#ffffff':'#ff8a3d',1);
+    const p=clamp(d.sh/3,0,1);
+    g.globalCompositeOperation='lighter';
+    g.globalAlpha=.34+p*.42;g.strokeStyle=d.shFlash>0?'#ffffff':'#ffd08a';g.lineWidth=1;
+    g.beginPath();g.arc(dx+2,dy+2,6,0,6.283*p);g.stroke();
+    g.globalAlpha=1;g.globalCompositeOperation='source-over';
+  }
+
   const exf=st.exiting?Math.max(0,1-st.exitY/96):1;
   if(scene==='play'&&exf>0&&(st.entering>0||st.exiting||st.inv<=0||tick%8<4)){
     const P=plane(),px=Math.round(st.px)-6;
@@ -2389,10 +2595,10 @@ function draw(){
     const a=st.toastT>62?(78-st.toastT)/16:Math.min(1,st.toastT/14);
     const ty=st.boss?34:18, tl=st.toast.t;
     const bw=Math.max(76,tw(tl,2)+14);
-    g.globalAlpha=a*.72;g.fillStyle='#04050a';g.fillRect(2,ty,bw,st.toast.sub?21:14);
-    g.globalAlpha=a;g.fillStyle=st.toast.c;g.fillRect(2,ty,2,st.toast.sub?21:14);
+    g.globalAlpha=a*.72;g.fillStyle='#04050a';g.fillRect(2,ty,bw,st.toast.sub?28:14);
+    g.globalAlpha=a;g.fillStyle=st.toast.c;g.fillRect(2,ty,2,st.toast.sub?28:14);
     text(tl,8,ty+3,2,st.toast.c,a);
-    if(st.toast.sub)text(st.toast.sub,8,ty+13,1,'#c8d2de',a*.85);
+    if(st.toast.sub)text(st.toast.sub,8,ty+18,1,'#c8d2de',a*.85);
     g.globalAlpha=1;
   }
   if(st.banner&&st.bannerT>0){
@@ -2407,6 +2613,16 @@ function draw(){
     textC(st.banner.t,big?H/2-40:H/2-30,big?4:3,st.banner.c,a);
     if(st.banner.sub)textC(st.banner.sub,big?H/2-4:H/2-8,big?2:1,'#ffffff',a*.85);
     if(st.banner.sub2)textC(st.banner.sub2,H/2+6,1,'#7dffb0',a*.9);
+  }
+  if(st.spCast){                                      // 必殺技カットイン
+    const C=st.spCast;
+    const a=Math.min(1,C.t/9)*Math.min(1,(C.dur-C.t)/14);
+    g.globalAlpha=a*.62;g.fillStyle='#03060c';g.fillRect(0,86,W,52);
+    g.globalAlpha=a*.85;g.fillStyle=C.col;
+    g.fillRect(0,86,W,1);g.fillRect(0,137,W,1);
+    g.globalAlpha=1;
+    textC(C.name,C.sc===4?96:99,C.sc,C.col,a);
+    textC(C.sub,126,1,'#ffffff',a*.9);
   }
   if(scene==='over'||scene==='entry'){
     g.globalAlpha=.72;g.fillStyle='#04050a';g.fillRect(0,0,W,H);g.globalAlpha=1;
@@ -2677,6 +2893,29 @@ function drawHUD(T){
       (st.boost<90&&tick%10<5)?'#ffffff':TIER[4].col,1);
   }
   text(T.name,4,H-24,1,T.col);
+  {                                                   // 必殺技ボタン（右下・パイロットごと2回）
+    const k=pilotIdx(), S=SPECIAL[k], left=(st.sp&&st.sp[k])||0;
+    const on=left>0&&!st.spCast&&st.entering<=0;
+    g.globalAlpha=on?.18:.07;g.fillStyle=S.col;
+    g.fillRect(SPB.x,SPB.y,SPB.w,SPB.h);
+    g.globalAlpha=on?1:.35;g.strokeStyle=S.col;g.lineWidth=1;
+    g.strokeRect(SPB.x+.5,SPB.y+.5,SPB.w-1,SPB.h-1);
+    g.globalAlpha=1;
+    const lb='SP';
+    text(lb,SPB.x+Math.round((SPB.w-tw(lb,1))/2),SPB.y+5,1,on?S.col:'#4a5460',on?1:.55);
+    for(let i=0;i<2;i++){
+      g.fillStyle=i<left?S.col:'#26303c';
+      g.fillRect(SPB.x+9+i*10,SPB.y+16,7,4);
+    }
+    if(on&&tick%54<27){
+      g.globalAlpha=.5;g.strokeStyle=S.col;
+      g.strokeRect(SPB.x-1.5,SPB.y-1.5,SPB.w+3,SPB.h+3);g.globalAlpha=1;
+    }
+  }
+  if(st.ems>0){
+    const el='EMS '+Math.ceil(st.ems/60);
+    text(el,4,st.boost>0?H-45:H-35,1,tick%10<5?'#ffffff':'#ffd93d',1);
+  }
   if(st.combo>0){
     const label=st.combo+'x';
     text(label,W-4-tw(label,1),H-24,1,st.combo>=12?T.col:'#ffffff',1);
