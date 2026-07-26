@@ -2,7 +2,7 @@
 <!--
   DAWN OF RECLAMATION  /  地球奪還の夜明け
   帝都奪還大航空戦
-  ver 1.09
+  ver 1.10
 
   2026©Shinzo.Kasseki
 -->
@@ -77,7 +77,7 @@
 (()=>{
 const cv=document.getElementById('c'),g=cv.getContext('2d',{alpha:false});
 const W=240,H=360;
-const VERSION='1.09';
+const VERSION='1.10';
 g.imageSmoothingEnabled=false;
 const tc=document.getElementById('tc'),tg=tc.getContext('2d');
 const JP=/[぀-ヿ一-鿿]/;                        // 仮名・漢字を含むか
@@ -487,7 +487,7 @@ function syncBGM(){
   else if(scene==='title')w='title';
   else if(scene==='clear')w='clear';
   else if(scene==='over'||scene==='continue')w=null;
-  else if(st&&(st.warnT>0||st.briefT>0))w=null;   // 通達・警報は無音で聴かせる
+  else if(st&&(st.warnT>0||st.briefT>0||st.paused))w=null;   // 通達・警報・停止中は無音
   else if(st&&st.boss)w=(STAGES[st.stage-1]&&STAGES[st.stage-1].final)?'final':'boss';
   else w='battle';
   bgmSet(w);
@@ -680,7 +680,7 @@ function newGame(){
     boss:null,warnT:0,escorts:[],radio:null,briefT:0,shield:3,stars:[],opT:0,city:null,cityStage:0,
     deadT:0,victoryT:0,clearT:0,contT:0,credits:3,entering:0,toast:null,toastT:0,
     exiting:0,exitY:0,exitV:0,frozen:false,boost:0,rankIn:false,entered:false,rank:1,
-    sp:[2,2,2],spCast:null,ems:0,miss:[],drones:[]};
+    sp:[2,2,2],spCast:null,ems:0,miss:[],drones:[],paused:false,fx:0,fy:0};
   buildWave();
 }
 function isBossWave(w){return WCUM.indexOf(w)>=0;}
@@ -706,11 +706,11 @@ function buildWave(){
     let k=r===0?2:r===1?1:0;
     if(st.stage>2&&r===2&&Math.random()<.4)k=1;
     const sp=KIND[k].sp[0];
-    st.enemies.push({x:22+c*21,bx:22+c*21,ox:0,ov:0,cool:0,dive:null,
-      y:startY+r*16,k,w:sp[0].length,h:sp.length,
+    st.enemies.push({x:22+c*21,bx:22+c*21,ox:0,ov:0,cool:0,dive:null,ret:0,
+      y:startY+r*16,hx:22+c*21,hy:startY+r*16,k,w:sp[0].length,h:sp.length,
       hp:KIND[k].hp+tough,max:KIND[k].hp+tough,alive:true,flash:0});
   }
-  st.edir=1;st.eTimer=0;
+  st.edir=1;st.eTimer=0;st.fx=0;st.fy=0;           // 編隊全体のずれ（復帰位置の基準）
 }
 const SHCOL=['#ff4d6d','#ffd93d','#6fd0ff'];   // 残1／残2／残3
 function drawShield(){
@@ -1221,7 +1221,7 @@ function doContinue(){
   st.bullets=[];st.ebul=[];st.escorts=[];st.beams=[];st.boss=null;
   st.banner=null;st.bannerT=0;st.radio=null;st.warnT=0;st.victoryT=0;
   st.deadT=0;st.contT=0;st.parts=[];st.sparks=[];
-  st.sp=[2,2,2];st.spCast=null;st.ems=0;st.miss=[];st.drones=[];
+  st.sp=[2,2,2];st.spCast=null;st.ems=0;st.miss=[];st.drones=[];st.paused=false;
   buildWave();
   scene='play';
   snd(330,880,.4,'square',.07);
@@ -1233,6 +1233,14 @@ const SPECIAL=[
  {name:'ドナルド・トランプ',sub:'E.M.S.',     col:'#ffd93d', sc:3},
  {name:'五星紅旗',         sub:'WINGMEN',    col:'#ff8a3d', sc:4},
 ];
+const PSB={x:3,y:2,w:12,h:10};                   // ポーズボタン（ヘッダー左上）
+function inPSB(x,y){return x>=PSB.x-4&&x<=PSB.x+PSB.w+5&&y>=PSB.y-3&&y<=PSB.y+PSB.h+5;}
+function togglePause(){
+  if(scene!=='play'||!st||st.spCast)return;
+  st.paused=!st.paused;
+  touching=false;
+  snd(st.paused?320:520,st.paused?150:920,.22,'square',.05);
+}
 const FOOT=34;                                   // フッターの高さ
 const SPB={cx:W-20,cy:H-17,r:14};                // 必殺ボタン（フッター内・〇型）
 function inSPB(x,y){const dx=x-SPB.cx,dy=y-SPB.cy;const R=SPB.r+7;return dx*dx+dy*dy<=R*R;}
@@ -1269,6 +1277,8 @@ function press(fromKey){
 cv.addEventListener('touchstart',e=>{e.preventDefault();
   const q=toLocal(e.touches[0].clientX,e.touches[0].clientY);
   ensureAudio();
+  if(scene==='play'&&inPSB(q.x,q.y)){togglePause();return;}
+  if(scene==='play'&&st.paused)return;                       // 停止中は操作を受けない
   if(scene==='play'&&inSPB(q.x,q.y)){trySpecial();return;}   // 必殺技ボタンでは移動しない
   touching=true;tx=q.x;ty=q.y;press();},{passive:false});
 cv.addEventListener('touchmove',e=>{e.preventDefault();
@@ -1276,6 +1286,8 @@ cv.addEventListener('touchmove',e=>{e.preventDefault();
 cv.addEventListener('touchend',e=>{e.preventDefault();touching=false;},{passive:false});
 cv.addEventListener('mousedown',e=>{
   const q=toLocal(e.clientX,e.clientY);
+  if(scene==='play'&&inPSB(q.x,q.y)){togglePause();return;}
+  if(scene==='play'&&st.paused)return;
   if(scene==='play'&&inSPB(q.x,q.y)){trySpecial();return;}
   touching=true;tx=q.x;ty=q.y;press();});
 cv.addEventListener('mousemove',e=>{if(touching)tx=toLocal(e.clientX,e.clientY).x;});
@@ -1291,7 +1303,8 @@ muteUI();
 window.addEventListener('keydown',e=>{keys[e.key]=true;
   if(e.key===' '||e.key==='Enter'){e.preventDefault();press(true);}
   if(e.key==='m'||e.key==='M')toggleMute();
-  if(e.key==='z'||e.key==='Z'){e.preventDefault();trySpecial();}});
+  if(e.key==='z'||e.key==='Z'){e.preventDefault();trySpecial();}
+  if(e.key==='p'||e.key==='P'||e.key==='Escape'){e.preventDefault();togglePause();}});
 window.addEventListener('keyup',e=>{keys[e.key]=false;});
 
 /* ================= スコア係数（ステージ / 武器 / 位置） ================= */
@@ -2003,7 +2016,7 @@ function updateSwarm(){
     }
     return;
   }
-  const form=alive.filter(e=>!e.dive);             // 隊列を保っている機体
+  const form=alive.filter(e=>!e.dive&&!e.ret);     // 隊列を保っている機体
   const speed=Math.max(7,10+form.length*.85-st.wave*.5);
   st.eTimer++;
   if(st.eTimer>=speed&&form.length){
@@ -2012,13 +2025,13 @@ function updateSwarm(){
     for(const e of form){
       if(st.edir>0&&e.bx+e.w+2>W-6)edge=true;
       if(st.edir<0&&e.bx-2<6)edge=true;}
-    if(edge){st.edir*=-1;for(const e of form)e.y+=6;}
-    else for(const e of form)e.bx+=st.edir*2;
+    if(edge){st.edir*=-1;st.fy+=6;for(const e of form)e.y+=6;}
+    else {st.fx+=st.edir*2;for(const e of form)e.bx+=st.edir*2;}
     snd(90+form.length*.8,null,.05,'triangle',.022);
     for(const e of form)if(e.y+e.h>=st.py-8)gameOver();
   }
   // 突入を仕掛ける機体
-  const diving=alive.length-form.length;
+  const diving=alive.filter(e=>e.dive).length;
   const maxDive=Math.min(4,1+Math.floor(st.stage/3));
   if(diving<maxDive&&form.length>4&&Math.random()<.0035+st.stage*.0010){
     const e=form[rint(0,form.length-1)];
@@ -2035,7 +2048,20 @@ function updateSwarm(){
       if(st.inv<=0&&Math.abs(e.x+e.w/2-st.px)<9&&Math.abs(e.y+4-(st.py+6))<10){
         e.alive=false; damage('zako');
       }
-      if(e.y>H+14||e.x<-34||e.x>W+34)e.alive=false;   // 突破または離脱
+      if(e.y>H+14||e.x<-34||e.x>W+34){                // 抜けた機体は上空から隊列へ戻る
+        e.dive=null; e.ret=1; e.ox=0; e.ov=0; e.cool=0;
+        e.bx=clamp(e.hx+st.fx,6,W-e.w-6); e.x=e.bx;
+        e.y=-e.h-rnd(8,44);
+      }
+      continue;
+    }
+    if(e.ret){                                        // 原隊への復帰中
+      const hx=clamp(e.hx+st.fx,6,W-e.w-6), hy=e.hy+st.fy, dy=hy-e.y;
+      e.bx+=(hx-e.bx)*.10; e.x=e.bx;
+      e.y+=Math.abs(dy)<14?Math.sign(dy)*Math.min(Math.abs(dy),1.0):clamp(dy*.09,-2.8,2.8);
+      if(Math.abs(dy)<1.2&&Math.abs(hx-e.bx)<1.5){    // 定位置に収まったら隊列へ復帰
+        e.y=hy; e.bx=hx; e.x=hx; e.ret=0;
+      }
       continue;
     }
     // 向かってくる弾を横に避ける（損傷機ほど大きく動く）
@@ -2322,7 +2348,7 @@ function noteHi(){
 }
 function gameOver(){
   if(scene==='over'||scene==='entry')return;
-  scene='over';st.deadT=0;noteHi();
+  scene='over';st.deadT=0;st.paused=false;noteHi();
   st.rankIn=LB.qualifies(st.score); st.rank=LB.rankOf(st.score); st.entered=false;
   flash=1;shake=10;snd(300,60,.9,'sawtooth',.08);
 }
@@ -2588,6 +2614,15 @@ function draw(){
   g.globalAlpha=1;g.globalCompositeOperation='source-over';
 
   for(const p of st.pops)text(p.txt,Math.round(p.x),Math.round(p.y),1,p.col,Math.min(1,p.life/18));
+
+  if(scene==='play'&&st.paused){                    // 一時停止
+    g.globalAlpha=.66;g.fillStyle='#04050a';g.fillRect(0,0,W,H);g.globalAlpha=1;
+    g.globalAlpha=.5;g.fillStyle='#ffe14d';
+    g.fillRect(30,H/2-34,W-60,1);g.fillRect(30,H/2+26,W-60,1);g.globalAlpha=1;
+    textC('PAUSED',H/2-24,3,'#ffe14d',1);
+    textC('一時停止中',H/2+2,1,'#9fb4d0',1);
+    if(tick%50<32)textC('TAP PAUSE ICON TO RESUME',H/2+16,1,'#ffffff',1);
+  }
 
   drawHUD(T);
 
@@ -2857,7 +2892,14 @@ function drawHUD(T){
   g.globalAlpha=.55;g.fillStyle='#04050a';
   g.fillRect(0,0,W,14); g.fillRect(0,H-FOOT,W,FOOT);
   g.globalAlpha=1;
-  text('SC',4,5,1,'#5f6b7a');text(String(st.score).padStart(6,'0'),18,5,1,'#ffffff');
+  {                                                    // ポーズボタン
+    g.globalAlpha=st.paused?1:.62;
+    g.fillStyle=st.paused?'#ffe14d':'#9fb4d0';
+    if(st.paused){ for(let i=0;i<5;i++)g.fillRect(PSB.x+3+i,PSB.y+i,1,PSB.h-i*2); }
+    else{ g.fillRect(PSB.x+2,PSB.y,3,PSB.h); g.fillRect(PSB.x+8,PSB.y,3,PSB.h); }
+    g.globalAlpha=1;
+  }
+  text('SC',20,5,1,'#5f6b7a');text(String(st.score).padStart(6,'0'),34,5,1,'#ffffff');
   const hs=Math.max(hiScore,st.score), hsg=st.score>hiScore?st.stage:hiStage;
   const hl='HI '+String(hs).padStart(6,'0')+' S'+hsg;
   text(hl,W-4-tw(hl,1),5,1,'#7f8fa6');
@@ -2985,6 +3027,7 @@ function loop(t){
     acc-=16.66;frameN++;
     if(scene==='title'){tick++;continue;}
     if(scene==='entry'){tick++;continue;}
+    if(scene==='play'&&st&&st.paused){tick++;continue;}   // 一時停止
     if(slowMo>0){slowMo--;
       if(frameN%3!==0){tick++;shake*=.9;flash*=.9;stepFX();continue;}}
     if(hitStop>0&&scene==='play'){hitStop--;tick++;stepFX();continue;}
