@@ -41,6 +41,21 @@
   #vig{position:absolute;inset:0;pointer-events:none;
     background:radial-gradient(ellipse at center,rgba(0,0,0,0) 60%,rgba(0,0,0,.55) 100%)}
   @media (prefers-reduced-motion:reduce){#crt{opacity:.2}}
+  #nameEntry{position:absolute;inset:0;z-index:10;display:none;
+    align-items:center;justify-content:center;background:rgba(4,5,10,.82)}
+  #nameEntry.on{display:flex}
+  #neInner{width:84%;max-width:224px;padding:16px 14px;border:1px solid #6fe8ff;border-radius:6px;
+    background:rgba(8,12,20,.97);box-shadow:0 0 26px rgba(111,232,255,.25);text-align:center}
+  #neTitle{color:#ffe14d;font-size:15px;letter-spacing:2px;font-weight:700}
+  #neRank{color:#9fb4d0;font-size:11px;letter-spacing:1px;margin-top:3px}
+  #neInput{margin-top:12px;width:100%;background:#04070c;color:#6fe8ff;border:1px solid #35506a;border-radius:4px;
+    text-align:center;font:700 26px/1.2 ui-monospace,Menlo,Consolas,monospace;letter-spacing:10px;
+    text-transform:uppercase;padding:8px 4px;outline:none;caret-color:#6fe8ff}
+  #neInput:focus{border-color:#6fe8ff}
+  #neHint{color:#5f6b7a;font-size:10px;margin-top:8px;letter-spacing:.5px}
+  #neOk{margin-top:12px;width:100%;padding:10px;background:#0d3f5c;color:#eafaff;border:1px solid #6fe8ff;
+    border-radius:4px;font:700 14px ui-monospace,Menlo,Consolas,monospace;letter-spacing:2px;cursor:pointer}
+  #neOk:active{background:#12557a}
 </style>
 </head>
 <body>
@@ -49,6 +64,13 @@
   <canvas id="tc"></canvas>
   <div id="crt"></div><div id="vig"></div>
   <button id="mute" aria-label="sound">♪</button>
+  <div id="nameEntry"><div id="neInner">
+    <div id="neTitle">NEW RECORD</div>
+    <div id="neRank">RANK #1</div>
+    <input id="neInput" maxlength="5" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="AAA">
+    <div id="neHint">A-Z / 0-9 ・ 5文字まで</div>
+    <button id="neOk">REGISTER</button>
+  </div></div>
 </div></div>
 <script>
 (()=>{
@@ -515,7 +537,7 @@ const TIER=[
 
 /* ================= 10ステージ / 10隻の敵旗艦 ================= */
 const STAGES=[
- {op:['シド4322-11','防空戦'],scen:'rural',
+ {op:['東かがわ上空','空戦'],scen:'rural',
   name:'SENTINEL', w:114,h:48, hull:'#7f8ea8',edge:'#cfe0f5',accent:'#3dd6ff',
   turrets:[[.5,.26],[.24,.62],[.76,.62]],
   gen:(x,y,w,h)=>{                                   // 菱形の哨戒艦
@@ -649,13 +671,13 @@ const MAXP=1500;
 
 function newGame(){
   st={px:W/2,py:H-40,lives:3,score:0,wave:1,stage:1,
-    combo:0,maxCombo:0,comboT:0,tier:0,fireCD:0,inv:0,
+    combo:0,maxCombo:0,comboT:0,tier:0,laserFloor:false,fireCD:0,inv:0,
     bullets:[],ebul:[],parts:[],pops:[],rings:[],sparks:[],beams:[],
     enemies:[],edir:1,eTimer:0,eFrame:0,
     ufos:[],midPend:0,midSpawned:false,fires:[],banner:null,bannerT:0,
     boss:null,warnT:0,escorts:[],radio:null,briefT:0,shield:3,stars:[],opT:0,city:null,cityStage:0,
     deadT:0,victoryT:0,clearT:0,contT:0,credits:3,entering:0,toast:null,toastT:0,
-    exiting:0,exitY:0,exitV:0,frozen:false,boost:0};
+    exiting:0,exitY:0,exitV:0,frozen:false,boost:0,rankIn:false,entered:false,rank:1};
   buildWave();
 }
 function isBossWave(w){return WCUM.indexOf(w)>=0;}
@@ -761,13 +783,13 @@ function spawnBoss(){
 
 /* ================= オープニング ================= */
 const OPSEQ=[
- {t:100 ,lines:['2026年','地球は征服された']},
- {t:340 ,lines:['残された戦力は','わずか三機']},
- {t:580 ,lines:['密かに隠された','空母 赤城より','発艦せよ']},
+ {t:100 ,lines:['2026年','日本は宇宙人に','占領された']},
+ {t:340 ,lines:['世界中から','国を越えて','仲間が集った']},
+ {t:580 ,lines:['空母 赤城より','いま 発艦せよ']},
  {t:820 ,launch:0},
  {t:960 ,launch:1},
  {t:1100,launch:2},
- {t:1240,lines:['頼むぞ','人類のすべてが','この三機にかかっている']},
+ {t:1240,lines:['チームいただき','作戦名 いただき','日本を救え']},
 ];
 const OPEND=1470;
 function initStars(){
@@ -894,7 +916,8 @@ function drawOpening(){
     textC('RECLAMATION',80,3,'#6fb6ff',a);
     g.globalAlpha=a*.55;g.fillStyle='#6fb6ff';g.fillRect(38,108,W-76,1);g.globalAlpha=1;
     textC('帝都奪還 大航空戦',116,1,'#c3d4e8',a*.95);
-    jdraw('2026 \u00a9 Shinzo.Kasseki',0,135,1,'#a8bcd4',a*.9,true);
+    textC('OPERATION  ITADAKI',127,1,'#6fb6ff',a*.9);
+    jdraw('2026 \u00a9 Shinzo.Kasseki',0,139,1,'#a8bcd4',a*.9,true);
     if(lt>150&&tick%50<30)textC('PRESS TO LAUNCH',300,2,'#ffffff',1);
   }
   if(T>40&&T<OPEND&&tick%60<34)textC('TAP TO SKIP',340,1,'#9fb8cc',.9);
@@ -1180,7 +1203,7 @@ function toLocal(cx,cy){const r=cv.getBoundingClientRect();
 const CY1=228,CY2=272,CBH=36;          // コンティニュー選択ボタン
 function doContinue(){
   st.credits--;
-  st.lives=3;st.combo=0;st.tier=0;st.comboT=0;st.inv=140;
+  st.lives=3;st.combo=0;st.tier=0;st.laserFloor=false;st.comboT=0;st.inv=140;st.rankIn=false;st.entered=false;
   st.wave=stageStart(st.stage);
   st.bullets=[];st.ebul=[];st.escorts=[];st.beams=[];st.boss=null;
   st.banner=null;st.bannerT=0;st.radio=null;st.warnT=0;st.victoryT=0;
@@ -1193,7 +1216,10 @@ function press(fromKey){
   ensureAudio();
   if(scene==='title'){scene='opening';st.opT=0;initStars();snd(70,180,1.4,'triangle',.06);}
   else if(scene==='opening'&&st.opT>34){newGame();scene='play';snd(220,660,.18,'square',.06);}
-  else if(scene==='over'&&st.deadT>30){scene='continue';st.contT=600;snd(200,120,.3,'square',.05);}
+  else if(scene==='over'&&st.deadT>30){
+    if(st.rankIn&&!st.entered){startNameEntry();}
+    else{scene='continue';st.contT=600;snd(200,120,.3,'square',.05);}
+  }
   else if(scene==='continue'){
     if(fromKey||(ty>=CY1&&ty<=CY1+CBH)){
       if(st.credits>0)doContinue(); else snd(140,70,.25,'square',.05);
@@ -1224,6 +1250,93 @@ window.addEventListener('keydown',e=>{keys[e.key]=true;
   if(e.key==='m'||e.key==='M')toggleMute();});
 window.addEventListener('keyup',e=>{keys[e.key]=false;});
 
+/* ================= スコア係数（ステージ / 武器 / 位置） ================= */
+const WCOEF=[1.30,1.18,1.08,0.95,0.85];               // PULSE高め … LASER/ANNIHILATE控えめ
+function stageCoef(){ return 1 + 0.18*(((st&&st.stage)||1)-1); }   // 後半ほど基本単価UP
+function weaponCoef(){ const w=WCOEF[st?st.tier:0]; return w===undefined?1:w; }
+function posCoef(y){ const top=18, bot=(st&&st.py?st.py:H-40);
+  return 1 + clamp((y-top)/(bot-top),0,1); }           // 上端×1.0 → 自機付近×2.0（名古屋撃ち）
+function killScore(base,y){
+  return Math.max(1, Math.round(base*stageCoef()*weaponCoef()*posCoef(y)*mult()));
+}
+
+/* ================= リーダーボード（現状ローカル / 後でオンライン） ================= */
+/* ▼▼ ここに Firebase の Web設定を入れると全員共通ランキングが有効化されます（GAS採用時は別アダプタに差し替え）▼▼ */
+const FIREBASE_CONFIG = null;
+const LB=(function(){
+  const LKEY='dor_lb_v1', NKEY='dor_name';
+  let cache=[], online=null;
+  const read=()=>{try{return JSON.parse(localStorage.getItem(LKEY))||[]}catch(e){return[]}};
+  const write=a=>{try{localStorage.setItem(LKEY,JSON.stringify(a))}catch(e){}};
+  const sortTrim=a=>{a.sort((x,y)=>y.score-x.score||(x.t||0)-(y.t||0));return a.slice(0,50);};
+  cache=sortTrim(read());
+  function refresh(){ if(online&&online.fetch){online.fetch().then(a=>{if(Array.isArray(a))cache=sortTrim(a);}).catch(()=>{});} }
+  function setProvider(p){ online=p; refresh(); }
+  function top(n){ return cache.slice(0,n||5); }
+  function qualifies(score){ if(!score||score<=0)return false; return cache.length<5 || score>cache[4].score; }
+  function rankOf(score){ let r=1; for(const e of cache){ if(e.score>score)r++; } return r; }
+  function submit(entry){
+    const e={name:(entry.name||'AAA').slice(0,5),score:entry.score|0,stage:entry.stage|0,t:Date.now()};
+    write(sortTrim(read().concat([e]))); cache=sortTrim(cache.concat([e]));
+    if(online&&online.submit){ online.submit(e).then(()=>refresh()).catch(()=>{}); }
+    return e;
+  }
+  const lastName=()=>{try{return localStorage.getItem(NKEY)||''}catch(e){return''}};
+  const setLastName=n=>{try{localStorage.setItem(NKEY,n)}catch(e){}};
+  return {top,qualifies,rankOf,submit,refresh,setProvider,lastName,setLastName,isOnline:()=>!!online};
+})();
+async function initOnlineLB(cfg){
+  const A=await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js');
+  const F=await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
+  const db=F.getFirestore(A.initializeApp(cfg));
+  LB.setProvider({
+    submit:e=>F.addDoc(F.collection(db,'scores'),{name:e.name,score:e.score,stage:e.stage,t:F.serverTimestamp()}),
+    fetch:async()=>{const s=await F.getDocs(F.query(F.collection(db,'scores'),F.orderBy('score','desc'),F.limit(50)));return s.docs.map(d=>d.data());}
+  });
+}
+if(FIREBASE_CONFIG){ initOnlineLB(FIREBASE_CONFIG).catch(e=>console.warn('online LB init failed',e)); }
+LB.refresh();
+
+/* ================= 名前入力（ランクイン時） ================= */
+const neEl=document.getElementById('nameEntry'),
+      neInput=document.getElementById('neInput'),
+      neOk=document.getElementById('neOk'),
+      neRank=document.getElementById('neRank');
+const sanitizeName=v=>(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);
+function startNameEntry(){
+  scene='entry';
+  neInput.value=sanitizeName(LB.lastName());
+  neRank.textContent='RANK #'+(st.rank||1);
+  neEl.classList.add('on');
+  try{ neInput.focus(); setTimeout(()=>{try{neInput.focus();neInput.select();}catch(e){}},40); }catch(e){}
+}
+function confirmName(){
+  let nm=sanitizeName(neInput.value); if(!nm)nm='AAA';
+  LB.setLastName(nm);
+  LB.submit({name:nm,score:st.score,stage:st.stage});
+  st.entered=true; neEl.classList.remove('on');
+  scene='continue'; st.contT=600; snd(660,900,.25,'square',.05);
+}
+if(neInput){
+  neInput.addEventListener('input',()=>{neInput.value=sanitizeName(neInput.value);});
+  neInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();confirmName();} e.stopPropagation(); });
+}
+if(neOk){ const h=e=>{e.preventDefault();e.stopPropagation();confirmName();};
+  neOk.addEventListener('click',h); neOk.addEventListener('touchstart',h,{passive:false}); }
+
+/* ================= ランキング描画 ================= */
+function drawRanking(y0){
+  const list=LB.top(5);
+  textC('RANKING  '+(LB.isOnline()?'GLOBAL':'LOCAL'),y0,1,'#7f8fa6',1);
+  if(!list.length){ textC('NO DATA YET',y0+14,1,'#4b5a6e',1); return; }
+  for(let i=0;i<list.length;i++){
+    const e=list[i], y=y0+13+i*11, rc=i===0?'#ffe14d':'#9fb4d0';
+    text((i+1)+' '+e.name, 20, y, 1, rc, 1);
+    const r='ST'+(e.stage||1)+'  '+e.score;
+    text(r, W-20-tw(r,1), y, 1, rc, 1);
+  }
+}
+
 /* ================= コンボ ================= */
 const mult=()=>1+st.combo*0.12;
 function addCombo(){
@@ -1234,7 +1347,7 @@ function addCombo(){
   if(nt>st.tier){
     st.tier=nt;flash=1;shake=8;chroma=3;
     if(nt>=4){                                     // 最終段階は時限式
-      st.boost=300;
+      st.boost=300; st.laserFloor=true;
       st.banner={t:'OVERDRIVE',c:TIER[4].col,sub:'5 SEC BURST'};st.bannerT=90;
       flash=Math.max(flash,.8);shake=Math.max(shake,7);chroma=3;
       st.rings.push({x:st.px,y:st.py+5,r:1,max:120,col:TIER[4].col,lw:1});
@@ -1260,7 +1373,7 @@ function hurtEnemy(e,dmg){
   const K=KIND[e.k],sp=K.sp[st.eFrame];
   burst(e.x,e.y,sp,TIER[st.tier].col,Math.min(3,e.k+st.tier*.5));
   addCombo();
-  const pts=Math.round(K.pts*mult());
+  const pts=killScore(K.pts,e.y);
   st.score+=pts;pop(e.x,e.y-4,'+'+pts,TIER[st.tier].col);
   snd(560-e.k*90+st.combo*6,140,.12,'square',.05);
   return true;
@@ -1344,7 +1457,7 @@ function updateMids(){
     if(U.laser>0){
       U.laser--;
       if(U.laser<54&&st.inv<=0&&st.entering<=0&&
-         (Math.abs(st.px-(U.x+3))<6||Math.abs(st.px-(U.x+13))<6))damage();
+         (Math.abs(st.px-(U.x+3))<6||Math.abs(st.px-(U.x+13))<6))damage('mid');
       if(U.laser===54){snd(180,90,.5,'sawtooth',.05);shake=Math.max(shake,4);}
     }else if(--U.fire<=0){
       U.fire=rint(240,420); U.laser=76; snd(900,1500,.4,'sine',.035);
@@ -1375,7 +1488,7 @@ function midHit(U,dmg,x,y){
   U.dead=1; U.fv=0; U.vx*=.4;                   // 制御を失って墜ちていく
   blast(U.x+8,U.y+3,40,'#ffe14d',26);
   addCombo();
-  const pts=Math.round(900*mult());
+  const pts=killScore(900,U.y);
   st.score+=pts; pop(U.x,U.y-8,'+'+pts,'#ffe14d');
   flash=.55; hitStop=6;
   snd(1200,220,.4,'sawtooth',.07);
@@ -1398,7 +1511,7 @@ function escortHit(e,dmg,x,y){
   e.alive=false;
   burst(e.x,e.y,ESCORT,TIER[st.tier].col,1);
   addCombo();
-  const pts=Math.round((e.mode==='p'?40:25)*mult());
+  const pts=killScore(e.mode==='p'?40:25,e.y);
   st.score+=pts; pop(e.x,e.y-4,'+'+pts,TIER[st.tier].col);
   snd(600,180,.1,'square',.04);
   return 2;
@@ -1426,7 +1539,7 @@ function bossHit(bx,by,dmg){
       if(t.hp<=0){
         t.alive=false;t.wreck=1;blast(cx,cy,44,B.D.accent,42);
         carve(cx,cy,7);
-        addCombo();const pts=Math.round(400*mult());st.score+=pts;
+        addCombo();const pts=killScore(400,cy);st.score+=pts;
         pop(cx-16,cy-14,'+'+pts,B.D.accent);
         flash=.7;hitStop=6;chroma=3;
         snd(160,50,.6,'sawtooth',.08);
@@ -1492,7 +1605,7 @@ function update(){
   if(scene!=='play'&&scene!=='over')return;
   if(scene==='over'){
     st.deadT++;
-    if(st.deadT===140){scene='continue';st.contT=600;snd(200,120,.3,'square',.05);}
+    if(st.deadT===140 && !(st.rankIn&&!st.entered)){scene='continue';st.contT=600;snd(200,120,.3,'square',.05);}
     stepFX();return;
   }
   if(st.briefT>0){                                  // 作戦通達中は交戦しない
@@ -1559,11 +1672,16 @@ function update(){
     st.comboT--;
     if(st.comboT<=0){
       const old=st.tier;
-      st.tier=Math.max(0,st.tier-1);
-      if(st.tier>=4)st.tier=3;
-      st.combo=TIER[st.tier].need;
-      st.comboT=st.combo>0?170:0;
-      if(old!==st.tier){pop(st.px-14,st.py-24,'DOWN','#ff5555');snd(300,90,.25,'sawtooth',.05);}
+      const floor=st.laserFloor?3:0;                 // OVERDRIVE後はLASERを下限に維持
+      if(st.tier>floor){
+        st.tier=Math.max(floor,st.tier-1);
+        if(st.tier>=4)st.tier=3;
+        st.combo=TIER[st.tier].need;
+        st.comboT=st.combo>0?170:0;
+        if(old!==st.tier){pop(st.px-14,st.py-24,'DOWN','#ff5555');snd(300,90,.25,'sawtooth',.05);}
+      }else{
+        st.combo=0;st.comboT=0;                       // 下限：武器は保ち倍率のみリセット
+      }
     }
   }
 
@@ -1610,7 +1728,7 @@ function update(){
   // 敵弾
   for(let i=st.ebul.length-1;i>=0;i--){
     const b=st.ebul[i]; if(!b)continue;
-    if(st.inv<=0&&Math.abs(b.x-st.px)<7&&b.y>st.py+1&&b.y<st.py+12){st.ebul.splice(i,1);damage();}
+    if(st.inv<=0&&Math.abs(b.x-st.px)<7&&b.y>st.py+1&&b.y<st.py+12){st.ebul.splice(i,1);damage(b.src);}
   }
   stepFX();
 }
@@ -1709,9 +1827,9 @@ function updateSwarm(){
     if(e.dive){                                    // 降下しながら撃ち、抜けたら離脱
       e.dive.t++;
       e.bx+=e.dive.vx; e.y+=e.dive.vy; e.x=e.bx;
-      if(e.dive.t%46===0)st.ebul.push({x:e.x+e.w/2,y:e.y+e.h,vy:2.3});
+      if(e.dive.t%46===0)st.ebul.push({x:e.x+e.w/2,y:e.y+e.h,vy:2.3,src:'zako'});
       if(st.inv<=0&&Math.abs(e.x+e.w/2-st.px)<9&&Math.abs(e.y+4-(st.py+6))<10){
-        e.alive=false; damage();
+        e.alive=false; damage('zako');
       }
       if(e.y>H+14||e.x<-34||e.x>W+34)e.alive=false;   // 突破または離脱
       continue;
@@ -1737,7 +1855,7 @@ function updateSwarm(){
     for(const e of form){const k=Math.round(e.bx/21);if(!cols[k]||e.y>cols[k].y)cols[k]=e;}
     const arr=Object.values(cols);
     if(arr.length){const e=arr[(Math.random()*arr.length)|0];
-      st.ebul.push({x:e.x+e.w/2,y:e.y+e.h,vy:1.4+st.wave*.1});}
+      st.ebul.push({x:e.x+e.w/2,y:e.y+e.h,vy:1.4+st.wave*.1,src:'zako'});}
   }
 }
 
@@ -1767,9 +1885,9 @@ function updateEscorts(){
         e.ang+=e.spd;
         e.x=e.host.x+8+Math.cos(e.ang)*e.rad-2;
         e.y=e.host.y+3+Math.sin(e.ang)*e.rad*e.ry;
-        if(--e.fire<=0){e.fire=rint(150,300);st.ebul.push({x:e.x+2,y:e.y+5,vy:2.0});}
+        if(--e.fire<=0){e.fire=rint(150,300);st.ebul.push({x:e.x+2,y:e.y+5,vy:2.0,src:'mid'});}
         if(st.inv<=0&&st.entering<=0&&Math.abs(e.x+2-st.px)<8&&Math.abs(e.y+2-st.py)<7){
-          e.alive=false;damage();}
+          e.alive=false;damage('mid');}
         continue;
       }
     }
@@ -1781,15 +1899,15 @@ function updateEscorts(){
         e.y=B.y+B.D.h*.74+Math.sin(e.ang)*e.rad*e.ry+4;
         if(--e.fire<=0&&B.phase==='fight'){
           e.fire=rint(150,300);
-          st.ebul.push({x:e.x+2,y:e.y+5,vy:1.8});
+          st.ebul.push({x:e.x+2,y:e.y+5,vy:1.8,src:'escort'});
         }
       }else{e.y+=1.5;if(e.y>H+6)e.alive=false;}
     }else{                                          // 射出されて突っ込んでくる機体
       e.x+=Math.sin(e.t*.05)*1.1;e.y+=e.vy;
       if(e.y>H+6)e.alive=false;
-      if(e.t%90===0)st.ebul.push({x:e.x+2,y:e.y+5,vy:1.9});
+      if(e.t%90===0)st.ebul.push({x:e.x+2,y:e.y+5,vy:1.9,src:'escort'});
     }
-    if(st.inv<=0&&Math.abs(e.x+2-st.px)<8&&Math.abs(e.y+2-st.py)<7){e.alive=false;damage();}
+    if(st.inv<=0&&Math.abs(e.x+2-st.px)<8&&Math.abs(e.y+2-st.py)<7){e.alive=false;damage('escort');}
   }
   st.escorts=st.escorts.filter(e=>e.alive);
 }
@@ -1828,7 +1946,7 @@ function updateBoss(){
     if(t.cd<=0){
       t.cd=Math.max(50,Math.round((rint(100,200)-B.lvl*4)*(B.turrets.length/4)));
       const sp=1.7+B.lvl*.2;
-      st.ebul.push({x:cx,y:cy+4,vx:Math.cos(t.ang)*sp*.5,vy:Math.max(.8,Math.sin(t.ang)*sp)});
+      st.ebul.push({x:cx,y:cy+4,vx:Math.cos(t.ang)*sp*.5,vy:Math.max(.8,Math.sin(t.ang)*sp),src:'boss'});
       snd(300,180,.08,'square',.03);
     }
     // バリアは僅かに再生（放置すると戻る）
@@ -1869,7 +1987,7 @@ function updateBoss(){
     else if(s.fire>0){
       s.fire--;
       const bx=B.x+s.ox;
-      if(st.inv<=0&&Math.abs(st.px-((bx+s.x)/2))<9&&Math.abs(st.px-s.x)<14)damage();
+      if(st.inv<=0&&Math.abs(st.px-((bx+s.x)/2))<9&&Math.abs(st.px-s.x)<14)damage('boss');
       if(tick%3===0)st.sparks.push({x:s.x+rnd(-6,6),y:H-30,vx:rnd(-1,1),vy:rnd(-2,-.5),life:16,col:D.accent});
       if(s.fire===0)B.sweep=null;
     }
@@ -1951,11 +2069,19 @@ function sinkBoss(){
 }
 
 /* --- 盾 --- */
-function damage(){
+function hitPenalty(src){
+  const stg=(st&&st.stage)||1;
+  const stageP=1+0.4*(NSTAGE-stg);                  // 序盤ほど大／最終ステージで最小
+  const SRC={zako:1.0,escort:0.6,mid:0.5,boss:0.28};// 雑魚=大減点／ボス=小減点
+  const sp=SRC[src]!==undefined?SRC[src]:1.0;
+  return Math.round(60*stageP*sp);
+}
+function damage(src){
   if(st.inv>0)return;
-  st.combo=0;st.tier=0;st.comboT=0;
+  st.combo=0;st.tier=0;st.comboT=0;st.laserFloor=false;
   if(st.shield>0){                                  // バリアが肩代わりする
     st.shield--;
+    const pen=hitPenalty(src); if(pen>0){st.score=Math.max(0,st.score-pen);pop(st.px+6,st.py-16,'-'+pen,'#ff5b6e');}
     st.inv=64;flash=.5;shake=7;chroma=3;hitStop=5;
     const c=SHCOL[Math.max(0,st.shield-1)];
     st.rings.push({x:st.px,y:st.py+5,r:10,max:36,col:c,lw:1});
@@ -1982,8 +2108,9 @@ function noteHi(){
   if(st.score>hiScore){hiScore=st.score;hiStage=st.stage;}
 }
 function gameOver(){
-  if(scene==='over')return;
+  if(scene==='over'||scene==='entry')return;
   scene='over';st.deadT=0;noteHi();
+  st.rankIn=LB.qualifies(st.score); st.rank=LB.rankOf(st.score); st.entered=false;
   flash=1;shake=10;snd(300,60,.9,'sawtooth',.08);
 }
 function stepRadio(){
@@ -2259,13 +2386,18 @@ function draw(){
     if(st.banner.sub)textC(st.banner.sub,big?H/2-4:H/2-8,big?2:1,'#ffffff',a*.85);
     if(st.banner.sub2)textC(st.banner.sub2,H/2+6,1,'#7dffb0',a*.9);
   }
-  if(scene==='over'){
+  if(scene==='over'||scene==='entry'){
     g.globalAlpha=.72;g.fillStyle='#04050a';g.fillRect(0,0,W,H);g.globalAlpha=1;
     textC('GAME OVER',H/2-46,3,'#ff4d6d',1);
     textC('SCORE '+st.score,H/2-14,2,'#ffffff',1);
     textC('MAX COMBO '+st.maxCombo,H/2+6,1,'#c77dff',1);
     textC('STAGE '+st.stage+' / '+NSTAGE,H/2+20,1,'#7f8fa6',1);
-    textC('HI '+hiScore+'  STAGE '+hiStage,H/2+34,1,'#7f8fa6',1);
+    if(st.rankIn&&!st.entered){
+      textC('NEW RECORD   RANK '+st.rank,H/2+40,1,'#ffe14d',1);
+      if(scene==='over'&&tick%50<32)textC('TAP TO ENTER NAME',H/2+54,1,'#ffffff',1);
+    }else{
+      textC('HI '+hiScore+'  STAGE '+hiStage,H/2+34,1,'#7f8fa6',1);
+    }
   }
   if(scene==='continue')drawContinue();
   g.restore();
@@ -2561,12 +2693,10 @@ function drawTitle(){
   textC('RECLAMATION',152,3,c,1);
   g.globalAlpha=.5;g.fillStyle=c;g.fillRect(36,178,W-72,1);g.globalAlpha=1;
   textC('帝都奪還 大航空戦',190,1,'#9fb4d0',1);
-  textC('2026',208,1,'#5f6b7a',1);
+  textC('OPERATION  ITADAKI',204,1,c,1);
+  textC('2026',218,1,'#5f6b7a',1);
   if(tick%50<32)textC('TAP TO START',258,2,'#ffffff',1);
-  if(hiScore){
-    textC('HI '+hiScore,300,2,'#ffe14d',1);
-    textC('REACHED STAGE '+hiStage+' / '+NSTAGE,322,1,'#7f8fa6',1);
-  }
+  drawRanking(274);
   jdraw('2026 \u00a9 Shinzo.Kasseki',0,347,1,'#78889c',1,true);
 }
 function overlay(){
@@ -2587,6 +2717,7 @@ function loop(t){
   while(acc>=16.66){
     acc-=16.66;frameN++;
     if(scene==='title'){tick++;continue;}
+    if(scene==='entry'){tick++;continue;}
     if(slowMo>0){slowMo--;
       if(frameN%3!==0){tick++;shake*=.9;flash*=.9;stepFX();continue;}}
     if(hitStop>0&&scene==='play'){hitStop--;tick++;stepFX();continue;}
