@@ -1261,8 +1261,8 @@ function killScore(base,y){
 }
 
 /* ================= リーダーボード（現状ローカル / 後でオンライン） ================= */
-/* ▼▼ ここに Firebase の Web設定を入れると全員共通ランキングが有効化されます（GAS採用時は別アダプタに差し替え）▼▼ */
-const FIREBASE_CONFIG = null;
+/* ▼▼ ここにGASウェブアプリの /exec URL を入れると全員共通ランキングが有効化されます ▼▼ */
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwkv7aceU9_UpUdTyitsUzwwX68iaSTnSTGNzX3psqVOecVmVIIJ5oYo0pIEWdJxu9l/exec';
 const LB=(function(){
   const LKEY='dor_lb_v1', NKEY='dor_name';
   let cache=[], online=null;
@@ -1285,16 +1285,26 @@ const LB=(function(){
   const setLastName=n=>{try{localStorage.setItem(NKEY,n)}catch(e){}};
   return {top,qualifies,rankOf,submit,refresh,setProvider,lastName,setLastName,isOnline:()=>!!online};
 })();
-async function initOnlineLB(cfg){
-  const A=await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js');
-  const F=await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
-  const db=F.getFirestore(A.initializeApp(cfg));
-  LB.setProvider({
-    submit:e=>F.addDoc(F.collection(db,'scores'),{name:e.name,score:e.score,stage:e.stage,t:F.serverTimestamp()}),
-    fetch:async()=>{const s=await F.getDocs(F.query(F.collection(db,'scores'),F.orderBy('score','desc'),F.limit(50)));return s.docs.map(d=>d.data());}
+function lbJSONP(url){
+  return new Promise((resolve,reject)=>{
+    const cb='__lb_cb_'+(lbJSONP._n=(lbJSONP._n||0)+1);
+    const s=document.createElement('script');
+    const to=setTimeout(()=>{cleanup();reject(new Error('timeout'));},9000);
+    function cleanup(){clearTimeout(to);try{delete window[cb];}catch(e){}s.remove();}
+    window[cb]=d=>{cleanup();resolve(d);};
+    s.onerror=()=>{cleanup();reject(new Error('jsonp error'));};
+    s.src=url+(url.indexOf('?')<0?'?':'&')+'callback='+cb+'&cb='+Date.now();
+    document.head.appendChild(s);
   });
 }
-if(FIREBASE_CONFIG){ initOnlineLB(FIREBASE_CONFIG).catch(e=>console.warn('online LB init failed',e)); }
+function initOnlineLB(url){
+  LB.setProvider({
+    fetch:async()=>{ const d=await lbJSONP(url); return (d&&d.scores)||[]; },
+    submit:async(e)=>{ await lbJSONP(url+(url.indexOf('?')<0?'?':'&')+'action=submit'
+      +'&name='+encodeURIComponent(e.name)+'&score='+(e.score|0)+'&stage='+(e.stage|0)); }
+  });
+}
+if(GAS_URL){ try{ initOnlineLB(GAS_URL); }catch(e){ console.warn('online LB init failed',e); } }
 LB.refresh();
 
 /* ================= 名前入力（ランクイン時） ================= */
