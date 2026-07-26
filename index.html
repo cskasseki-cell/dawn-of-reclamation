@@ -2,6 +2,7 @@
 <!--
   DAWN OF RECLAMATION  /  地球奪還の夜明け
   帝都奪還大航空戦
+  ver 1.08
 
   2026©Shinzo.Kasseki
 -->
@@ -76,6 +77,7 @@
 (()=>{
 const cv=document.getElementById('c'),g=cv.getContext('2d',{alpha:false});
 const W=240,H=360;
+const VERSION='1.08';
 g.imageSmoothingEnabled=false;
 const tc=document.getElementById('tc'),tg=tc.getContext('2d');
 const JP=/[぀-ヿ一-鿿]/;                        // 仮名・漢字を含むか
@@ -2958,7 +2960,8 @@ function drawTitle(){
   textC('2026',218,1,'#5f6b7a',1);
   if(tick%50<32)textC('TAP TO START',258,2,'#ffffff',1);
   drawRanking(274);
-  jdraw('2026 \u00a9 Shinzo.Kasseki',0,347,1,'#78889c',1,true);
+  jdraw('2026 \u00a9 Shinzo.Kasseki',0,340,1,'#78889c',1,true);
+  textC('VER '+VERSION,351,1,'#4b5a6e',1);
 }
 function overlay(){
   if(flash>.02){
