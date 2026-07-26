@@ -770,7 +770,7 @@ function spawnBoss(){
     phase:'approach',t:0,dying:0,sweepT:rint(300,500),sweep:null,escortT:200,lvl,
     holes:[]};
   st.banner=null;
-  const np=2+Math.floor(lvl/3);                   // 哨戒・護衛機が随伴している
+  const fin=D.final; const np=fin?10:(6+Math.floor(lvl/2));                   // 哨戒・護衛機が随伴している
   st.boss.np=np; st.boss.resp=0;
   const esh=5+lvl*2;
   for(let i=0;i<np;i++)st.escorts.push({mode:'p',
@@ -778,6 +778,15 @@ function spawnBoss(){
     spd:(Math.random()<.5?1:-1)*rnd(.007,.015),
     x:W/2,y:40,t:rint(0,90),fire:rint(90,260),alive:true,
     sh:esh,shMax:esh,shFlash:0,guard:0});
+  const nu=fin?4:(1+Math.floor(lvl/3));           // 中ボス戦に小ボス(艦隊司令艦)を随伴
+  for(let u=0;u<nu;u++){
+    const msh=22+lvl*7, mhp=14+lvl*5;
+    const U={x:(u+1)*(W/(nu+1))-8,y:28+(u%2)*14,ph:rnd(0,6.283),
+      vx:(u%2?-1:1)*rnd(.4,.75),sh:msh,shMax:msh,shFlash:0,
+      hp:mhp,hpMax:mhp,flash:0,fire:rint(220,360),laser:0,esc:rint(120,220),dead:0,fv:0};
+    st.ufos.push(U);
+    for(let k=0;k<2;k++)addMidEscort(U,k,2);
+  }
   snd(70,40,1.6,'sawtooth',.07);
 }
 
@@ -1448,16 +1457,7 @@ function updateMids(){
         blast(U.x+8,U.y+3,rnd(10,20)*(1-U.dead/260),'#ffb03d',rint(6,12));
         snd(rnd(200,340),90,.2,'sawtooth',.04);
       }
-      if(U.y>=GROUND){                            // 地表で炎上
-        const cx=clamp(U.x+8,12,W-12), cy=GROUND+4;
-        blast(cx,cy,64,'#ff8a3d',52);
-        for(let k=0;k<5;k++)st.rings.push({x:cx,y:cy,r:1+k*7,max:110+k*30,
-          col:k%2?'#ffffff':'#ff8a3d',lw:1});
-        for(let k=0;k<5;k++)st.fires.push({x:clamp(cx+rnd(-22,22),8,W-8),
-          y:clamp(cy+rnd(-8,14),GROUND-12,H-14),r:rnd(4,11),ph:rnd(0,6.283),
-          life:rint(420,640)});
-        flash=Math.max(flash,.7); shake=Math.max(shake,10); hitStop=5;
-        noise(.7,.09); snd(70,24,1.1,'sawtooth',.09);
+      if(U.y>H+18||U.dead>170){                    // 後方へ流れ、画面外へフェードアウトして消える
         st.ufos.splice(i,1);
       }
       continue;
@@ -1581,6 +1581,7 @@ function carve(cx,cy,r){
 function startSink(){
   const B=st.boss;B.phase='dying';B.dying=0;B.fall=0;B.crashed=false;B.after=0;
   B.sweep=null;B.sweepT=99999;
+  st.ufos.forEach(U=>{if(!U.dead){U.dead=1;U.fv=0;U.vx*=.4;}});   // 残った小ボスも退場
   slowMo=120;flash=1;shake=12;chroma=3;
   st.banner=null;st.bullets.length=0;st.beams.length=0;
   scatterEscorts(null);                         // 母艦を失った護衛は散る
@@ -1991,22 +1992,27 @@ function updateBoss(){
   }
   // 掃射レーザー
   B.sweepT--;
-  if(B.armT<=0&&!B.sweep&&B.sweepT<=0){
-    const t=B.turrets.filter(q=>q.alive);
-    if(t.length){const q=t[rint(0,t.length-1)];
-      B.sweep={ox:q.ox,oy:q.oy,warn:70,fire:0,x:st.px};snd(200,900,.7,'sine',.04);}
-    B.sweepT=rint(420,680);
-  }
-  if(B.sweep){
-    const s=B.sweep;
-    if(s.warn>0){s.warn--;if(s.warn===0){s.fire=42;shake=6;noise(.4,.05);}}
-    else if(s.fire>0){
-      s.fire--;
-      const bx=B.x+s.ox;
-      if(st.inv<=0&&Math.abs(st.px-((bx+s.x)/2))<9&&Math.abs(st.px-s.x)<14)damage('boss');
-      if(tick%3===0)st.sparks.push({x:s.x+rnd(-6,6),y:H-30,vx:rnd(-1,1),vy:rnd(-2,-.5),life:16,col:D.accent});
-      if(s.fire===0)B.sweep=null;
+  if(B.armT<=0&&(!B.sweep||!B.sweep.length)&&B.sweepT<=0){
+    const av=B.turrets.filter(q=>q.alive);
+    if(av.length){
+      const nb=Math.min(av.length,1+(B.lvl>=2?1:0)+(B.lvl>=5?1:0)+(B.lvl>=8?1:0)); // 2門〜段階的に増加
+      const idx=[]; while(idx.length<nb){const r=rint(0,av.length-1); if(idx.indexOf(r)<0)idx.push(r);}
+      B.sweep=idx.map(r=>({ox:av[r].ox,oy:av[r].oy,warn:70,fire:0,x:st.px+rnd(-10,10)}));
+      snd(200,900,.7,'sine',.04);
     }
+    B.sweepT=rint(240,420);                        // 発射間隔を短縮（頻度UP）
+  }
+  if(B.sweep&&B.sweep.length){
+    for(const s of B.sweep){
+      if(s.warn>0){s.warn--;if(s.warn===0){s.fire=42;shake=Math.max(shake,6);noise(.4,.05);}}
+      else if(s.fire>0){
+        s.fire--;
+        const bx=B.x+s.ox;
+        if(st.inv<=0&&Math.abs(st.px-((bx+s.x)/2))<9&&Math.abs(st.px-s.x)<14)damage('boss');
+        if(tick%3===0)st.sparks.push({x:s.x+rnd(-6,6),y:H-30,vx:rnd(-1,1),vy:rnd(-2,-.5),life:16,col:D.accent});
+      }
+    }
+    B.sweep=B.sweep.filter(s=>s.warn>0||s.fire>0);
   }
   if(aliveT===0)startSink();
 }
@@ -2264,7 +2270,7 @@ function draw(){
       const sc=Math.max(.28,1-U.dead/300);
       const w=Math.round(16*sc);
       spriteScaled(UFO,ux+Math.round((16-w)/2),Math.round(U.y),'#a8763a',sc,
-        Math.max(.35,1-U.dead/420));
+        Math.max(0,1-U.dead/150));
       continue;
     }
     if(U.laser>0){                                   // 照準と照射
@@ -2454,8 +2460,8 @@ function drawBoss(){
   }
 
   // 掃射予告・照射
-  if(B.sweep){
-    const s=B.sweep,cx=bx+s.ox,cy=by+s.oy;
+  if(B.sweep&&B.sweep.length)for(const s of B.sweep){
+    const cx=bx+s.ox,cy=by+s.oy;
     if(s.warn>0&&tick%6<3){
       g.strokeStyle=D.accent;g.globalAlpha=.5;g.lineWidth=1;
       g.beginPath();g.moveTo(cx,cy);g.lineTo(s.x,H);g.stroke();g.globalAlpha=1;
