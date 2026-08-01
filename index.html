@@ -2,7 +2,7 @@
 <!--
   DAWN OF RECLAMATION  /  地球奪還の夜明け
   帝都奪還大航空戦
-  ver 1.16
+  ver 1.17
 
   2026©Shinzo.Kasseki
 -->
@@ -77,7 +77,7 @@
 (()=>{
 const cv=document.getElementById('c'),g=cv.getContext('2d',{alpha:false});
 const W=240,H=360;
-const VERSION='1.16';
+const VERSION='1.17';
 g.imageSmoothingEnabled=false;
 const tc=document.getElementById('tc'),tg=tc.getContext('2d');
 const JP=/[぀-ヿ一-鿿]/;                        // 仮名・漢字を含むか
@@ -430,7 +430,59 @@ const SONG={
   bass:[0,R,R,7, R,R,0,R, 0,R,R,7, R,R,0,R],
   lead:[12,R,16,R, 19,R,24,R, 19,R,16,R, 12,R,R,R],
   drum:[1,0,3,0, 2,0,3,0, 1,0,3,0, 2,0,3,3]},
+ /* --- ステージ別 道中BGM（全10ステージ・すべて新規） --- */
+ st1:{bpm:138,roots:[45,45,50,43],
+  bass:[0,R,R,0, R,0,R,R, 0,R,R,0, 7,R,0,R],
+  lead:[12,R,14,R, 16,R,14,R, 12,R,16,R, 19,R,R,R],
+  drum:[1,0,3,0, 2,0,3,0, 1,0,3,0, 2,0,3,3]},
+ st2:{bpm:144,roots:[43,48,45,50],
+  bass:[0,R,0,R, R,0,7,R, 0,R,0,R, 5,R,7,R],
+  lead:[7,R,12,R, R,14,R,12, 16,R,14,R, 12,R,R,R],
+  drum:[1,0,3,0, 2,0,3,3, 1,0,3,0, 2,3,3,0]},
+ st3:{bpm:158,roots:[41,41,46,48],
+  bass:[0,0,R,0, 7,R,0,R, 0,0,R,0, 5,R,7,R],
+  lead:[12,R,15,17, R,15,R,12, 19,R,17,R, 15,R,12,R],
+  drum:[1,0,3,1, 2,0,3,0, 1,0,3,1, 2,0,3,3]},
+ st4:{bpm:168,roots:[40,40,45,38],
+  bass:[0,0,0,R, 0,R,0,0, 0,0,0,R, 7,R,0,0],
+  lead:[12,R,R,12, 15,R,12,R, 17,R,15,R, 12,R,R,R],
+  drum:[1,3,3,1, 2,3,3,1, 1,3,3,1, 2,3,2,3]},
+ st5:{bpm:150,roots:[42,42,49,47],
+  bass:[0,R,0,0, R,0,R,R, 0,R,0,0, 7,R,5,R],
+  lead:[12,R,13,R, 16,R,13,R, 12,R,R,17, 16,R,13,R],
+  drum:[1,0,3,0, 2,0,3,0, 1,0,3,3, 2,0,3,0]},
+ st6:{bpm:160,roots:[44,44,42,49],
+  bass:[0,0,R,0, 0,R,R,0, 0,0,R,0, 5,R,7,R],
+  lead:[12,14,R,12, R,17,R,R, 14,R,12,R, 10,R,12,R],
+  drum:[1,3,2,3, 1,3,2,3, 1,3,2,3, 1,3,2,2]},
+ st7:{bpm:132,roots:[39,39,46,44],
+  bass:[0,R,R,R, 0,R,R,0, 0,R,R,R, 7,R,R,0],
+  lead:[12,R,R,R, 15,R,R,12, R,R,17,R, 15,R,12,R],
+  drum:[1,0,0,3, 2,0,0,0, 1,0,0,3, 2,0,3,0]},
+ st8:{bpm:164,roots:[46,46,41,48],
+  bass:[0,R,0,0, R,0,0,R, 0,R,0,0, 5,R,7,7],
+  lead:[12,R,16,R, 19,R,16,R, 21,R,19,R, 16,R,12,R],
+  drum:[1,3,3,0, 2,3,3,0, 1,3,3,0, 2,3,3,3]},
+ st9:{bpm:174,roots:[43,45,41,40],
+  bass:[0,0,0,0, 7,R,0,0, 0,0,0,0, 5,R,7,R],
+  lead:[12,15,R,12, 17,R,15,R, 12,15,R,19, 17,R,15,R],
+  drum:[1,3,2,3, 1,3,2,3, 1,3,2,3, 2,3,2,3]},
+ st10:{bpm:172,roots:[47,45,43,41],
+  bass:[0,0,R,0, 0,R,0,R, 0,0,R,0, 7,R,5,R],
+  lead:[12,R,14,15, R,14,R,12, 19,R,17,R, 15,R,14,R],
+  drum:[1,3,2,3, 1,3,2,1, 1,3,2,3, 2,3,3,3]},
+ /* --- 旗艦戦BGM バリエーション（ステージで巡回） --- */
+ boss2:{bpm:170,roots:[40,40,39,45],
+  bass:[0,0,R,0, 0,R,0,0, 0,0,R,0, 0,R,7,R],
+  lead:[12,R,13,R, 15,R,13,R, 12,R,R,17, 15,R,12,R],
+  drum:[1,3,2,1, 2,3,3,1, 1,3,2,1, 2,3,2,3]},
+ boss3:{bpm:174,roots:[36,43,41,36],
+  bass:[0,0,0,R, 0,R,0,R, 0,0,0,R, 7,R,0,0],
+  lead:[12,R,15,R, 19,R,15,R, 12,R,17,R, 15,R,12,R],
+  drum:[1,3,3,1, 2,3,3,3, 1,3,3,1, 2,3,2,3]},
 };
+const STBGM=['st1','st2','st3','st4','st5','st6','st7','st8','st9','st10'];
+const BOSSBGM=['boss','boss2','boss3'];
 let NOISEBUF=null;
 function unlockAudio(){
   if(!AC)return;
@@ -524,8 +576,10 @@ function syncBGM(){
   else if(scene==='entry')w=null;
   else if(scene==='over'||scene==='continue')w=null;
   else if(st&&(st.warnT>0||st.briefT>0||st.paused))w=null;   // 通達・警報・停止中は無音
-  else if(st&&st.boss)w=(STAGES[st.stage-1]&&STAGES[st.stage-1].final)?'final':'boss';
+  else if(st&&st.boss)w=(STAGES[st.stage-1]&&STAGES[st.stage-1].final)?'final':BOSSBGM[(st.stage-1)%BOSSBGM.length];
+  else if(st)w=STBGM[clamp(st.stage-1,0,STBGM.length-1)];   // 道中はステージごとに別曲
   else w='battle';
+  if(w&&!SONG[w])w='battle';                                 // 万一の取りこぼしは従来曲へ
   bgmSet(w);
 }
 function muteUI(){
@@ -1287,14 +1341,37 @@ function canSpecial(){
   return scene==='play'&&st&&!st.spCast&&st.entering<=0&&st.briefT<=0&&
          st.sp&&st.sp[pilotIdx()]>0;
 }
+/* 必殺技ごとの発動音（3種とも別物） */
+function spSfx(k){
+  if(muted||!ensureAudio())return;
+  if(k===0){                                        // ライジングサン：射出 → 5発の上昇 → 日の出のファンファーレ
+    noise(.42,.085);
+    snd(90,42,.55,'sawtooth',.085);
+    for(let i=0;i<5;i++)setTimeout(()=>{
+      snd(260+i*90,1500+i*230,.34,'sawtooth',.042); noise(.10,.026);
+    },90+i*70);
+    [523,659,784,1046].forEach((f,i)=>setTimeout(()=>snd(f,f,.30,'square',.055),470+i*95));
+    setTimeout(()=>snd(1046,2093,.55,'square',.05),860);
+  }else if(k===1){                                  // E.M.S.：帯電 → 放電 → 敵システムの機能停止
+    for(let i=0;i<7;i++)setTimeout(()=>snd(1500+i*230,1320+i*230,.05,'square',.032),i*46);
+    setTimeout(()=>{noise(.55,.095); snd(140,3200,.34,'sawtooth',.075);},330);
+    setTimeout(()=>{snd(3200,90,.85,'sawtooth',.08); noise(.35,.05);},430);
+    setTimeout(()=>snd(240,60,.75,'triangle',.05),780);
+  }else{                                            // 五星紅旗：僚機2機のエンジン始動 → 展開完了の和音
+    snd(70,58,.30,'triangle',.06); noise(.22,.05);
+    [0,150].forEach((dl,i)=>setTimeout(()=>{
+      snd(180+i*70,880+i*150,.42,'sawtooth',.055); noise(.16,.03);
+    },120+dl));
+    [784,988,1319].forEach((f,i)=>setTimeout(()=>snd(f,f,.26,'square',.05),560+i*90));
+  }
+}
 function trySpecial(){
   if(!canSpecial()){ if(scene==='play')snd(140,70,.2,'square',.04); return false; }
   const k=pilotIdx(), S=SPECIAL[k];
   st.sp[k]--;
   st.spCast={kind:k,name:S.name,sub:S.sub,col:S.col,sc:S.sc,t:0,dur:120};
   flash=Math.max(flash,.6); shake=Math.max(shake,6); chroma=3;
-  snd(180,1400,.7,'sawtooth',.07);
-  setTimeout(()=>snd(300,1900,.5,'square',.05),130);
+  spSfx(k);
   return true;
 }
 function press(fromKey){
@@ -1841,15 +1918,16 @@ function castEMS(){
   toast('E.M.S.','敵 5秒 無防備','#ffd93d');
 }
 
-/* --- 必殺技③ 五星紅旗：自機と連動する僚機ドローン2機 --- */
+/* --- 必殺技③ 五星紅旗：自機の前方に展開して弾よけになる僚機2機 --- */
+const DRONE_DX=7, DRONE_DY=-13, DRONE_SH=5;   // 自機からの左右オフセット / 前方（上）へのオフセット / 耐弾数
 function castWingmen(){
   st.drones=[];
   for(const s of [-1,1])
-    st.drones.push({side:s,x:st.px+s*18,y:st.py+3,sh:3,shFlash:0,ph:rnd(0,6.283)});
+    st.drones.push({side:s,x:st.px+s*DRONE_DX,y:st.py+DRONE_DY,sh:DRONE_SH,shFlash:0,ph:rnd(0,6.283)});
   for(const d of st.drones)st.rings.push({x:d.x,y:d.y,r:1,max:40,col:'#ff8a3d',lw:1});
   flash=Math.max(flash,.5);
   snd(520,1200,.4,'square',.05);
-  toast('WINGMEN','僚機 2機 展開','#ff8a3d');
+  toast('WINGMEN','僚機2機 前方展開','#ff8a3d');
 }
 function updateDrones(){
   if(!st.drones||!st.drones.length)return;
@@ -1863,9 +1941,9 @@ function updateDrones(){
       if(d.out>70||d.y<-16)st.drones.splice(i,1);     // バリアごと画面外へ
       continue;
     }
-    d.ph+=.06;
-    d.x+=(clamp(st.px+d.side*18,6,W-6)-d.x)*.22;
-    d.y+=((st.py+3+Math.sin(d.ph)*2)-d.y)*.22;
+    d.ph+=.06;                                        // 自機の斜め前方に張り付いて盾になる
+    d.x+=(clamp(st.px+d.side*DRONE_DX,6,W-6)-d.x)*.26;
+    d.y+=((st.py+DRONE_DY+Math.sin(d.ph)*1.5)-d.y)*.26;
   }
 }
 function applySpecial(k){
@@ -2034,9 +2112,9 @@ function update(){
   for(let i=st.ebul.length-1;i>=0;i--){
     const b=st.ebul[i]; if(!b)continue;
     if(st.inv<=0&&Math.abs(b.x-st.px)<7&&b.y>st.py+1&&b.y<st.py+12){st.ebul.splice(i,1);damage(b.src);continue;}
-    for(const d of st.drones){                        // 僚機が身代わりになる
+    for(const d of st.drones){                        // 前方の僚機が実弾を受け止める（レーザーは貫通）
       if(d.out)continue;
-      if(Math.abs(b.x-d.x)<5&&Math.abs(b.y-d.y)<6){
+      if(Math.abs(b.x-d.x)<8&&Math.abs(b.y-d.y)<6){
         d.sh--; d.shFlash=6;
         st.rings.push({x:d.x,y:d.y,r:1,max:18,col:'#ffd08a',lw:1});
         snd(700,300,.12,'square',.04);
@@ -2691,7 +2769,7 @@ function draw(){
     g.fillRect(dx+3,dy+7,1,d.out?Math.min(16,3+d.out*.4):3);
     g.globalAlpha=1;g.globalCompositeOperation='source-over';
     spriteO(WINGMAN,dx,dy,d.shFlash>0?'#ffffff':'#ff8a3d',ea);
-    const p=clamp(d.sh/3,0,1);
+    const p=clamp(d.sh/DRONE_SH,0,1);
     if(p>0){
       g.globalCompositeOperation='lighter';
       g.globalAlpha=ea*(.34+p*.42);g.strokeStyle=d.shFlash>0?'#ffffff':'#ffd08a';g.lineWidth=1;
