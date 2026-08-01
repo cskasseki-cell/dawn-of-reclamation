@@ -2,7 +2,7 @@
 <!--
   DAWN OF RECLAMATION  /  地球奪還の夜明け
   帝都奪還大航空戦
-  ver 1.15
+  ver 1.16
 
   2026©Shinzo.Kasseki
 -->
@@ -77,7 +77,7 @@
 (()=>{
 const cv=document.getElementById('c'),g=cv.getContext('2d',{alpha:false});
 const W=240,H=360;
-const VERSION='1.15';
+const VERSION='1.16';
 g.imageSmoothingEnabled=false;
 const tc=document.getElementById('tc'),tg=tc.getContext('2d');
 const JP=/[぀-ヿ一-鿿]/;                        // 仮名・漢字を含むか
@@ -2110,7 +2110,7 @@ function updateSwarm(){
     st.banner={t:'FLEET COMMAND',c:'#ffe14d',sub:'艦隊司令艦 出現'};st.bannerT=130;
     flash=.5;shake=5;snd(300,900,.5,'square',.06);
   }
-  if(alive.length===0&&st.ufos.some(U=>!U.dead&&!U.flee))return;  // 迎撃部隊を残して先へは進めない
+  if(alive.length===0&&st.ufos.length)return;      // 迎撃部隊が残っている間／撃墜機が墜ちきるまで次へ進まない
   if(alive.length===0){
     st.wave++; buildWave();
     if(!isBossWave(st.wave)&&st.briefT<=0){
@@ -2419,11 +2419,9 @@ function hitPenalty(src){
   const sp=SRC[src]!==undefined?SRC[src]:1.0;
   return Math.round(60*stageP*sp);
 }
-function stepDown(){                                // 兵装は一段階だけ落ちる
-  const floor=st.laserFloor?3:0;
+function stepDown(){                                // 被弾で兵装は必ず一段階だけ落ちる
   const old=st.tier;
-  st.tier=Math.max(floor,st.tier-1);
-  if(st.tier>=4)st.tier=3;
+  st.tier=Math.max(0,Math.min(3,st.tier-1));       // OVERDRIVE(4)からはLASER(3)へ。下限はPULSE(0)
   st.combo=TIER[st.tier].need;
   st.comboT=st.combo>0?170:0;
   if(old!==st.tier)pop(st.px-14,st.py-24,'DOWN','#ff5555');
