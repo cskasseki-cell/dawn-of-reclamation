@@ -2,7 +2,7 @@
 <!--
   DAWN OF RECLAMATION  /  地球奪還の夜明け
   帝都奪還大航空戦
-  ver 1.18
+  ver 1.19
 
   2026©Shinzo.Kasseki
 -->
@@ -77,7 +77,7 @@
 (()=>{
 const cv=document.getElementById('c'),g=cv.getContext('2d',{alpha:false});
 const W=240,H=360;
-const VERSION='1.18';
+const VERSION='1.19';
 g.imageSmoothingEnabled=false;
 const tc=document.getElementById('tc'),tg=tc.getContext('2d');
 const JP=/[぀-ヿ一-鿿]/;                        // 仮名・漢字を含むか
@@ -175,7 +175,7 @@ XX.X.XXXXX.X.XX
 .X...X...X...X.`)];
 // 人類に残された3機（上から見た機影）
 const PLANES=[
- {no:'01',col:'#ff5566',dim:'#7a2430',pilot:'竹本 一佐',force:'航空自衛隊',
+ {no:'01',col:'#ff5566',dim:'#7a2430',pilot:'武元 一佐',force:'航空自衛隊',
   sp:S(`
 ......X......
 .....XXX.....
@@ -770,7 +770,7 @@ function newGame(){
     boss:null,warnT:0,escorts:[],radio:null,briefT:0,shield:3,stars:[],opT:0,city:null,cityStage:0,
     deadT:0,victoryT:0,clearT:0,contT:0,credits:3,entering:0,toast:null,toastT:0,
     exiting:0,exitY:0,exitV:0,frozen:false,boost:0,rankIn:false,entered:false,rank:1,
-    sp:[2,2,2],spCast:null,ems:0,miss:[],drones:[],paused:false,fx:0,fy:0,entryBack:'continue'};
+    sp:[2,2,2],spGot:[true,false,false],legacyDone:false,legacyMsg:null,spCast:null,ems:0,miss:[],drones:[],paused:false,fx:0,fy:0,entryBack:'continue'};
   buildWave();
 }
 function isBossWave(w){return WCUM.indexOf(w)>=0;}
@@ -1313,7 +1313,7 @@ function doContinue(){
   st.bullets=[];st.ebul=[];st.escorts=[];st.beams=[];st.boss=null;
   st.banner=null;st.bannerT=0;st.radio=null;st.warnT=0;st.victoryT=0;
   st.deadT=0;st.contT=0;st.parts=[];st.sparks=[];
-  st.sp=[2,2,2];st.spCast=null;st.ems=0;st.miss=[];st.drones=[];st.paused=false;
+  st.sp=[2,2,2];st.spGot=[true,false,false];st.legacyDone=false;st.legacyMsg=null;st.spCast=null;st.ems=0;st.miss=[];st.drones=[];st.paused=false;
   buildWave();
   scene='play';
   snd(330,880,.4,'square',.07);
@@ -1321,10 +1321,14 @@ function doContinue(){
 }
 /* ================= 必殺技 ================= */
 const SPECIAL=[
- {name:'ライジングサン',   sub:'RISING SUN', col:'#ff3b30', sc:4},
- {name:'ドナルド・トランプ',sub:'E.M.S.',     col:'#ffd93d', sc:3},
- {name:'五星紅旗',         sub:'WINGMEN',    col:'#ff8a3d', sc:4},
+ {name:'ライジングサン',   sub:'RISING SUN', col:'#ff3b30', sc:4, tag:'RS'},
+ {name:'ドナルド・トランプ',sub:'E.M.S.',     col:'#ffd93d', sc:3, tag:'EM'},
+ {name:'五星紅旗',         sub:'WINGMEN',    col:'#ff8a3d', sc:4, tag:'WG'},
 ];
+/* 戦死した先任が、後任に自分の必殺技を託す（バリアを失った瞬間に発動） */
+const LEGACY=[null,
+ {head:'武元 一佐',           line:'ジョン負けるな！俺の武を託す！！',   col:'#ff5566'},
+ {head:'ジョン・マケイン少将',line:'チュン負けるな！俺たちの命を託す！！',col:'#5db4ff'}];
 const PSB={x:3,y:2,w:12,h:10};                   // ポーズボタン（ヘッダー左上）
 function inPSB(x,y){return x>=PSB.x-4&&x<=PSB.x+PSB.w+5&&y>=PSB.y-3&&y<=PSB.y+PSB.h+5;}
 function togglePause(){
@@ -1334,12 +1338,42 @@ function togglePause(){
   snd(st.paused?320:520,st.paused?150:920,.22,'square',.05);
 }
 const FOOT=34;                                   // フッターの高さ
-const SPB={cx:W-20,cy:H-17,r:14};                // 必殺ボタン（フッター内・〇型）
-function inSPB(x,y){const dx=x-SPB.cx,dy=y-SPB.cy;const R=SPB.r+7;return dx*dx+dy*dy<=R*R;}
+const SPB={cx:W-20,cy:H-17,r:12,gap:27};         // 必殺ボタン（フッター内・〇型／右下から左へ並ぶ）
 function pilotIdx(){return Math.min(2,Math.max(0,3-st.lives));}
-function canSpecial(){
-  return scene==='play'&&st&&!st.spCast&&st.entering<=0&&st.briefT<=0&&
-         st.sp&&st.sp[pilotIdx()]>0;
+/* 使える必殺技を右詰めで並べる。自機の技が一番右（＝親指の定位置）、継承した技が左へ伸びる */
+function spSlots(){
+  if(!st||!st.spGot)return [];
+  const p=pilotIdx(), order=[];
+  if(st.spGot[p])order.push(p);
+  for(let i=2;i>=0;i--)if(i!==p&&st.spGot[i])order.push(i);
+  return order.map((k,i)=>({k,cx:SPB.cx-i*SPB.gap,cy:SPB.cy}));
+}
+function spbHit(x,y){                            // 一番近いボタンを拾う（隣と判定が重なるため）
+  let best=-1,bd=1e9;
+  for(const s of spSlots()){const d=Math.hypot(x-s.cx,y-s.cy); if(d<bd){bd=d;best=s.k;}}
+  return bd<=SPB.r+6?best:-1;
+}
+function inSPB(x,y){return spbHit(x,y)>=0;}
+function canSpecial(k){
+  if(scene!=='play'||!st||st.spCast||st.entering>0||st.briefT>0)return false;
+  if(k===undefined){const s=spSlots()[0]; if(!s)return false; k=s.k;}
+  return !!(st.spGot&&st.spGot[k]&&st.sp&&st.sp[k]>0);
+}
+/* バリアを失った瞬間に先任の技を受け継ぐ（パイロットごとに一度きり） */
+function grantLegacy(){
+  const p=pilotIdx();
+  if(p<1||st.legacyDone||!LEGACY[p])return;
+  st.legacyDone=true;
+  for(let i=0;i<p;i++){ st.spGot[i]=true; st.sp[i]=2; }   // 継承した技は2回ぶん装填される
+  const L=LEGACY[p];
+  st.legacyMsg={head:L.head,line:L.line,col:L.col,t:0,life:280};
+  st.toastT=0;                                            // SHIELD DOWN のトーストと重ねない
+  flash=Math.max(flash,.7); shake=Math.max(shake,6); chroma=3;
+  st.rings.push({x:st.px,y:st.py+5,r:1,max:110,col:L.col,lw:1});
+  st.rings.push({x:st.px,y:st.py+5,r:1,max:70,col:'#ffffff',lw:1});
+  snd(200,900,.4,'square',.06);
+  setTimeout(()=>snd(523,784,.35,'square',.06),160);
+  setTimeout(()=>snd(784,1319,.55,'square',.06),330);
 }
 /* 必殺技ごとの発動音（3種とも別物） */
 function spSfx(k){
@@ -1365,9 +1399,10 @@ function spSfx(k){
     [784,988,1319].forEach((f,i)=>setTimeout(()=>snd(f,f,.26,'square',.05),560+i*90));
   }
 }
-function trySpecial(){
-  if(!canSpecial()){ if(scene==='play')snd(140,70,.2,'square',.04); return false; }
-  const k=pilotIdx(), S=SPECIAL[k];
+function trySpecial(k){
+  if(k===undefined||k===null){const s=spSlots()[0]; k=s?s.k:pilotIdx();}
+  if(!canSpecial(k)){ if(scene==='play')snd(140,70,.2,'square',.04); return false; }
+  const S=SPECIAL[k];
   st.sp[k]--;
   st.spCast={kind:k,name:S.name,sub:S.sub,col:S.col,sc:S.sc,t:0,dur:120};
   flash=Math.max(flash,.6); shake=Math.max(shake,6); chroma=3;
@@ -1401,7 +1436,7 @@ cv.addEventListener('touchstart',e=>{e.preventDefault();
   if(scene==='ranks'){rankDrag=q.y;rankMoved=false;return;}
   if(scene==='play'&&inPSB(q.x,q.y)){togglePause();return;}
   if(scene==='play'&&st.paused)return;                       // 停止中は操作を受けない
-  if(scene==='play'&&inSPB(q.x,q.y)){trySpecial();return;}   // 必殺技ボタンでは移動しない
+  if(scene==='play'){const sk=spbHit(q.x,q.y); if(sk>=0){trySpecial(sk);return;}}   // 必殺技ボタンでは移動しない
   touching=true;tx=q.x;ty=q.y;press();},{passive:false});
 cv.addEventListener('touchmove',e=>{e.preventDefault();
   const q=toLocal(e.touches[0].clientX,e.touches[0].clientY);
@@ -1415,7 +1450,7 @@ cv.addEventListener('mousedown',e=>{
   if(scene==='ranks'){rankDrag=q.y;rankMoved=false;return;}
   if(scene==='play'&&inPSB(q.x,q.y)){togglePause();return;}
   if(scene==='play'&&st.paused)return;
-  if(scene==='play'&&inSPB(q.x,q.y)){trySpecial();return;}
+  if(scene==='play'){const sk=spbHit(q.x,q.y); if(sk>=0){trySpecial(sk);return;}}
   touching=true;tx=q.x;ty=q.y;press();});
 cv.addEventListener('mousemove',e=>{
   if(scene==='ranks'){if(rankDrag!==null)rankScrollBy(toLocal(e.clientX,e.clientY).y);return;}
@@ -1440,7 +1475,9 @@ muteUI();
 window.addEventListener('keydown',e=>{keys[e.key]=true;
   if(e.key===' '||e.key==='Enter'){e.preventDefault();press(true);}
   if(e.key==='m'||e.key==='M')toggleMute();
-  if(e.key==='z'||e.key==='Z'){e.preventDefault();trySpecial();}
+  if('zxc'.indexOf((e.key||'').toLowerCase())>=0){e.preventDefault();
+    const sl=spSlots(), si='zxc'.indexOf(e.key.toLowerCase());
+    if(sl[si])trySpecial(sl[si].k);}
   if(e.key==='p'||e.key==='P'||e.key==='Escape'){e.preventDefault();togglePause();}});
 window.addEventListener('keyup',e=>{keys[e.key]=false;});
 
@@ -1996,6 +2033,7 @@ function update(){
   shake*=.86;chroma*=.9;flash*=.86;
   if(st&&st.bannerT>0)st.bannerT--;
   if(st&&st.toastT>0)st.toastT--;
+  if(st&&st.legacyMsg){st.legacyMsg.t++; if(--st.legacyMsg.life<=0)st.legacyMsg=null;}
   if(scene==='opening'){
     st.opT++;
     for(const s of st.stars){s.y+=s.z*1.6;if(s.y>H){s.y=-2;s.x=rnd(0,W);}}
@@ -2555,7 +2593,7 @@ function damage(src){
       st.sparks.push({x:st.px+Math.cos(a)*12,y:st.py+5+Math.sin(a)*9,
         vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:rnd(10,26),col:c});}
     snd(560,170,.3,'square',.06);
-    if(st.shield===0)toast('SHIELD DOWN','装甲 喪失','#ff4d6d');
+    if(st.shield===0){toast('SHIELD DOWN','装甲 喪失','#ff4d6d'); grantLegacy();}
     return;
   }
   const P=plane();
@@ -2566,6 +2604,8 @@ function damage(src){
   st.shield=3;
   snd(200,50,.5,'sawtooth',.08);
   if(st.lives<=0){gameOver();return;}
+  {const np=pilotIdx();                        // 後任は自分の技だけを持って上がる
+   st.spGot=[false,false,false]; st.spGot[np]=true; st.legacyDone=false; st.legacyMsg=null;}
   const N=plane();
   st.entering=110; st.px=W/2; st.inv=Math.max(st.inv,190);
   st.banner={t:N.no+' SCRAMBLE',c:N.col,sub:N.pilot};st.bannerT=150;
@@ -2886,6 +2926,19 @@ function draw(){
     text(tl,8,ty+3,2,st.toast.c,a);
     if(st.toast.sub)text(st.toast.sub,8,ty+18,1,'#c8d2de',a*.85);
     g.globalAlpha=1;
+  }
+  if(st.legacyMsg){                                   // 先任からの言葉（画面左上）
+    const M=st.legacyMsg;
+    const a=M.t<14?M.t/14:(M.life<34?M.life/34:1);
+    const y0=16, bw=W-8, bh=32;
+    g.globalAlpha=a*.88;g.fillStyle='#04070d';g.fillRect(4,y0,bw,bh);
+    g.globalAlpha=a*.55;g.strokeStyle=M.col;g.lineWidth=1;
+    g.strokeRect(4.5,y0+.5,bw-1,bh-1);
+    g.globalAlpha=a;g.fillStyle=M.col;g.fillRect(4,y0,2,bh);
+    [[4,y0],[W-7,y0],[4,y0+bh-3],[W-7,y0+bh-3]].forEach(q=>g.fillRect(q[0],q[1],3,3));
+    g.globalAlpha=1;
+    text(M.head,10,y0+4,1,M.col,a*(tick%36<24?1:.6));
+    text(M.line,10,y0+17,1,'#ffffff',a);
   }
   if(st.banner&&st.bannerT>0){
     const a=Math.min(1,st.bannerT/32);
@@ -3217,7 +3270,8 @@ function drawHUD(T){
   const hs=Math.max(hiScore,st.score), hsg=st.score>hiScore?st.stage:hiStage;
   const hl='HI '+String(hs).padStart(6,'0')+' S'+hsg;
   text(hl,W-4-tw(hl,1),5,1,'#7f8fa6');
-  const RX=SPB.cx-SPB.r-5;                             // 必殺ボタンより左に収める
+  const _sl=spSlots();                                 // 必殺ボタン群より左に収める
+  const RX=(_sl.length?_sl[_sl.length-1].cx:SPB.cx)-SPB.r-5;
   const fy=H-15, ry=H-29;
   for(let i=0;i<3;i++){                                // 残る機体
     const lost=i<(3-st.lives), cur=i===(3-st.lives);
@@ -3254,10 +3308,10 @@ function drawHUD(T){
       (st.boost<90&&tick%10<5)?'#ffffff':TIER[4].col,1);
   }
   text(T.name,4,ry,1,T.col);
-  {                                                   // 必殺ボタン（〇・パイロットごと2回）
-    const k=pilotIdx(), S=SPECIAL[k], left=(st.sp&&st.sp[k])||0;
+  for(const s of spSlots()){                          // 必殺ボタン（右下から左へ／各2回）
+    const S=SPECIAL[s.k], left=(st.sp&&st.sp[s.k])||0;
     const on=left>0&&!st.spCast&&st.entering<=0;
-    const cx=SPB.cx, cy=SPB.cy, r=SPB.r;
+    const cx=s.cx, cy=s.cy, r=SPB.r;
     g.globalAlpha=on?.20:.08;g.fillStyle=S.col;
     g.beginPath();g.arc(cx,cy,r,0,6.283);g.fill();
     g.globalAlpha=on?1:.4;g.strokeStyle=S.col;g.lineWidth=1;
@@ -3267,7 +3321,13 @@ function drawHUD(T){
       g.globalAlpha=.45;g.strokeStyle=S.col;
       g.beginPath();g.arc(cx,cy,r+3,0,6.283);g.stroke();g.globalAlpha=1;
     }
-    text('必殺',cx-9,cy-10,1,on?S.col:'#4a5460',on?1:.55);
+    if(st.legacyMsg&&s.k!==pilotIdx()&&tick%12<7){    // 受け継いだ直後は強く光らせる
+      g.globalCompositeOperation='lighter';
+      g.globalAlpha=.6;g.strokeStyle='#ffffff';g.lineWidth=1;
+      g.beginPath();g.arc(cx,cy,r+5,0,6.283);g.stroke();
+      g.globalAlpha=1;g.globalCompositeOperation='source-over';
+    }
+    text(S.tag,cx-Math.round(tw(S.tag,1)/2),cy-9,1,on?S.col:'#4a5460',on?1:.55);
     for(let i=0;i<2;i++){                             // 残り回数
       g.fillStyle=i<left?S.col:'#26303c';
       g.fillRect(cx-6+i*7,cy+4,5,3);
